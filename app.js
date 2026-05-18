@@ -589,10 +589,15 @@ function updateToggle() {
 }
 
 function updateCatGrid() {
-  const { categories } = getData();
-  const cats = categories[state.addType] || DEFAULT_CATEGORIES[state.addType];
+  const { categories, transactions } = getData();
+  const cats = [...(categories[state.addType] || DEFAULT_CATEGORIES[state.addType])];
+  const freq = {};
+  transactions.filter(t => t.type === state.addType).forEach(t => {
+    freq[t.category] = (freq[t.category] || 0) + 1;
+  });
+  cats.sort((a, b) => (freq[b.name] || 0) - (freq[a.name] || 0));
   document.getElementById('cat-grid').innerHTML = cats.map(c => `
-    <button class="cat-btn ${state.addCat === c.name ? 'selected' : ''}" onclick="selectCat('${c.name}')">
+    <button class="cat-btn ${state.addCat === c.name ? 'selected' : ''}" data-name="${c.name}" onclick="selectCat(this.dataset.name)">
       <span class="cat-emoji">${c.emoji}</span>
       <span>${c.name}</span>
     </button>`).join('');
