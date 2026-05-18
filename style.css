@@ -82,6 +82,10 @@ body {
 /* ---- PAGES ---- */
 .page { display: none; padding: 12px 12px 0; }
 .page.active { display: block; }
+.page.slide-from-right { animation: slideFromRight .22s cubic-bezier(.25,.46,.45,.94) both; }
+.page.slide-from-left  { animation: slideFromLeft  .22s cubic-bezier(.25,.46,.45,.94) both; }
+@keyframes slideFromRight { from { transform: translateX(48px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideFromLeft  { from { transform: translateX(-48px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
 /* ---- BOTTOM NAV ---- */
 #bottom-nav {

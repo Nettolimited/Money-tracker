@@ -426,10 +426,19 @@ function todayStr() {
 
 // ===== NAVIGATION =====
 
-function navigate(page) {
+const PAGE_ORDER = ['dashboard', 'add', 'list', 'charts'];
+
+function navigate(page, dir) {
+  if (!dir && state.page !== page) {
+    const oi = PAGE_ORDER.indexOf(state.page), ni = PAGE_ORDER.indexOf(page);
+    if (oi !== -1 && ni !== -1) dir = ni > oi ? 'left' : 'right';
+  }
   state.page = page;
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'slide-from-right', 'slide-from-left'));
+  const newEl = document.getElementById(`page-${page}`);
+  newEl.classList.add('active');
+  if (dir === 'left')  newEl.classList.add('slide-from-right');
+  if (dir === 'right') newEl.classList.add('slide-from-left');
   document.querySelectorAll('#bottom-nav button').forEach(b => {
     b.classList.toggle('active', b.dataset.page === page);
   });
@@ -1675,8 +1684,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (Math.abs(dx) < 60) return;
     const cur = swipePages.indexOf(state.page);
     if (cur === -1) return;
-    if (dx < -60 && cur < swipePages.length - 1) navigate(swipePages[cur + 1]);
-    if (dx >  60 && cur > 0)                     navigate(swipePages[cur - 1]);
+    if (dx < -60 && cur < swipePages.length - 1) navigate(swipePages[cur + 1], 'left');
+    if (dx >  60 && cur > 0)                     navigate(swipePages[cur - 1], 'right');
   }, { passive: true });
 
   if ('serviceWorker' in navigator) {
