@@ -198,10 +198,11 @@ async function initSync() {
     document.getElementById('app').style.display = 'block';
   } catch(e) { return; }
 
+  setSyncStatus('saving');
   return new Promise(resolve => {
     let resolved = false;
     const done = () => { if (!resolved) { resolved = true; resolve(); } };
-    setTimeout(done, 4000);
+    setTimeout(done, 8000);
 
     let firstFire = true;
     window._db.ref('appData').on('value', snap => {
@@ -212,6 +213,7 @@ async function initSync() {
           applyDefaults(_appData);
           localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
           setSyncStatus('ok');
+          if (resolved) reRenderPage(); // Firebase came after timeout — re-render
         } else {
           _lastSaveTime = Date.now();
           const local = getData();
@@ -228,7 +230,7 @@ async function initSync() {
       applyDefaults(_appData);
       localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
       reRenderPage();
-    }, () => done());
+    }, () => { setSyncStatus('offline'); done(); });
   });
 }
 
