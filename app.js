@@ -578,7 +578,7 @@ function updateAccountChips() {
   const sorted = [...accounts].sort((a, b) => (freq[b] || 0) - (freq[a] || 0));
   document.getElementById('account-chips').innerHTML = sorted.map(a => `
     <button class="account-chip ${state.addAccount === a ? 'selected' : ''}" data-name="${a}" onclick="selectAccount(this.dataset.name)">
-      ${a}${freq[a] ? '<span class="chip-freq">'+freq[a]+'</span>' : ''}
+      ${a}
     </button>`).join('');
 }
 
