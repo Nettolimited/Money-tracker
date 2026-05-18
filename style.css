@@ -33,6 +33,10 @@ input:checked + .slider::before { transform:translateX(20px); }
 .quick-chip { display:inline-flex; align-items:center; padding:6px 14px; border-radius:20px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); font-size:13px; font-weight:700; margin:4px 4px 0 0; cursor:pointer; }
 #quick-add-section { padding:0 0 8px; }
 
+/* Toast notification */
+.toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%) translateY(20px); background:#212121; color:#fff; padding:10px 22px; border-radius:24px; font-size:14px; font-weight:600; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none; z-index:9999; white-space:nowrap; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
 /* Daily chart scrollable container */
 .daily-chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
 .daily-chart-scroll::-webkit-scrollbar { height: 4px; }

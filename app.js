@@ -65,6 +65,19 @@ function getData() {
   }
 }
 
+function showToast(msg) {
+  let el = document.getElementById('app-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'app-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast show';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = 'toast'; }, 2000);
+}
+
 function setSyncStatus(state) {
   const el = document.getElementById('sync-status');
   if (!el) return;
@@ -541,6 +554,9 @@ function saveTransaction() {
   removeSlip();
   navigate('add');
   resetForm();
+  document.getElementById('main').scrollTop = 0;
+  window.scrollTo(0, 0);
+  showToast('✓ บันทึกแล้ว!');
 }
 
 async function _uploadSlipBackground(txId, file) {
