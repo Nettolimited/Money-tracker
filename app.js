@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.0';
+const APP_VERSION = '2.1';
 const CHANGELOG = [
+  { v: '2.1', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม ✏️ เปลี่ยนชื่อหมวดหมู่ + อัพเดทรายการเก่าทั้งหมดอัตโนมัติ' },
   { v: '2.0', date: '18 พ.ค. 68', note: 'แก้บั๊กหลัก: Firebase ไม่รับ "/" ในชื่อหมวดหมู่ (กาแฟ/น้ำหวาน) ทำให้ sync ไม่ได้มาตลอด!' },
   { v: '1.9', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม Force Pull/Push sync + แก้บั๊ก sync ช้า' },
   { v: '1.8', date: '18 พ.ค. 68', note: 'ล้างฟอร์มหลังบันทึก + toast แจ้งเตือน + scroll กลับบน' },
@@ -1163,7 +1164,10 @@ function renderSettings() {
         <div class="setting-item">
           <span style="font-size:20px">${c.emoji}</span>
           <span class="setting-name">${c.name}</span>
-          <button class="setting-del" onclick="deleteCategory('income','${c.name}')">🗑️</button>
+          <div style="display:flex;gap:6px">
+            <button class="setting-del" onclick="openRenameCategory('income','${c.name.replace(/'/g,"\\'")}')">✏️</button>
+            <button class="setting-del" onclick="deleteCategory('income','${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+          </div>
         </div>`).join('')}
       <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="openAddCat('income')">+ เพิ่มหมวดหมู่รายรับ</button>
     </div>
@@ -1174,7 +1178,10 @@ function renderSettings() {
         <div class="setting-item">
           <span style="font-size:20px">${c.emoji}</span>
           <span class="setting-name">${c.name}</span>
-          <button class="setting-del" onclick="deleteCategory('expense','${c.name}')">🗑️</button>
+          <div style="display:flex;gap:6px">
+            <button class="setting-del" onclick="openRenameCategory('expense','${c.name.replace(/'/g,"\\'")}')">✏️</button>
+            <button class="setting-del" onclick="deleteCategory('expense','${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+          </div>
         </div>`).join('')}
       <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="openAddCat('expense')">+ เพิ่มหมวดหมู่รายจ่าย</button>
     </div>
@@ -1210,6 +1217,50 @@ function renderSettings() {
 }
 
 // ---- Category CRUD ----
+
+function openRenameCategory(type, oldName) {
+  state._renameCatType = type;
+  state._renameCatOld  = oldName;
+  document.getElementById('modal-rename-cat-input').value = oldName;
+  document.getElementById('modal-rename-cat-title').textContent =
+    'เปลี่ยนชื่อ: ' + oldName;
+  openModal('modal-rename-cat');
+}
+
+function saveRenameCategory() {
+  const newName = document.getElementById('modal-rename-cat-input').value.trim();
+  const oldName = state._renameCatOld;
+  const type    = state._renameCatType;
+  if (!newName)          { alert('กรุณาใส่ชื่อใหม่'); return; }
+  if (newName === oldName) { closeModal('modal-rename-cat'); return; }
+
+  const data = getData();
+
+  // Rename in categories list
+  const cat = (data.categories[type] || []).find(c => c.name === oldName);
+  if (cat) cat.name = newName;
+
+  // Rename in all transactions
+  data.transactions.forEach(t => {
+    if (t.category === oldName) t.category = newName;
+  });
+
+  // Rename in budgets
+  if (data.budgets && data.budgets[oldName] !== undefined) {
+    data.budgets[newName] = data.budgets[oldName];
+    delete data.budgets[oldName];
+  }
+
+  // Rename in recurring templates
+  (data.recurringItems || []).forEach(r => {
+    if (r.category === oldName) r.category = newName;
+  });
+
+  saveData(data);
+  closeModal('modal-rename-cat');
+  renderSettings();
+  showToast('✓ เปลี่ยนชื่อแล้ว! อัพเดทรายการเก่าครบ');
+}
 
 function openAddCat(type) {
   state._addCatType = type;
