@@ -78,6 +78,46 @@ function showToast(msg) {
   el._t = setTimeout(() => { el.className = 'toast'; }, 2000);
 }
 
+async function forcePullFromFirebase() {
+  if (!window._db) { showToast('❌ ไม่มี Firebase'); return; }
+  const user = firebase.auth().currentUser;
+  if (!user) { showToast('❌ ยังไม่ได้ login'); return; }
+  setSyncStatus('saving');
+  try {
+    const snap = await window._db.ref('appData').once('value');
+    if (snap.exists()) {
+      _appData = snap.val();
+      applyDefaults(_appData);
+      localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
+      setSyncStatus('ok');
+      reRenderPage();
+      showToast('✓ ดึงข้อมูลจาก Cloud แล้ว! ' + (_appData.transactions||[]).length + ' รายการ');
+    } else {
+      setSyncStatus('offline');
+      showToast('⚠️ ไม่มีข้อมูลใน Firebase เลย!');
+    }
+  } catch(e) {
+    setSyncStatus('offline');
+    showToast('❌ ' + (e.code || e.message));
+  }
+}
+
+async function forcePushToFirebase() {
+  if (!window._db) { showToast('❌ ไม่มี Firebase'); return; }
+  const user = firebase.auth().currentUser;
+  if (!user) { showToast('❌ ยังไม่ได้ login'); return; }
+  setSyncStatus('saving');
+  try {
+    const data = getData();
+    await window._db.ref('appData').set(data);
+    setSyncStatus('ok');
+    showToast('✓ อัพข้อมูลขึ้น Cloud แล้ว! ' + (data.transactions||[]).length + ' รายการ');
+  } catch(e) {
+    setSyncStatus('offline');
+    showToast('❌ ' + (e.code || e.message));
+  }
+}
+
 function setSyncStatus(state) {
   const el = document.getElementById('sync-status');
   if (!el) return;
@@ -1020,6 +1060,17 @@ function renderSettings() {
   const expCats = categories.expense || DEFAULT_CATEGORIES.expense;
   const currentCycleDay = getCycleDay();
   document.getElementById('settings-container').innerHTML = `
+    <div class="card">
+      <div class="section-title">ซิงค์ข้อมูล</div>
+      <div style="display:flex;gap:8px;padding:4px 0 8px">
+        <button class="btn-secondary" style="flex:1;font-size:13px" onclick="forcePullFromFirebase()">☁️ ดึงจาก Cloud</button>
+        <button class="btn-secondary" style="flex:1;font-size:13px" onclick="forcePushToFirebase()">⬆️ อัพขึ้น Cloud</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary)">
+        ใช้เมื่อข้อมูลไม่ตรงกันระหว่างอุปกรณ์
+      </div>
+    </div>
+
     <div class="card">
       <div class="section-title">การแสดงผล</div>
       <div class="setting-item">
