@@ -1,3 +1,19 @@
+// ===== VERSION =====
+
+const APP_VERSION = '1.9';
+const CHANGELOG = [
+  { v: '1.9', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม Force Pull/Push sync + แก้บั๊ก sync ช้า' },
+  { v: '1.8', date: '18 พ.ค. 68', note: 'ล้างฟอร์มหลังบันทึก + toast แจ้งเตือน + scroll กลับบน' },
+  { v: '1.7', date: '18 พ.ค. 68', note: 'กราฟรายวันใหญ่ขึ้น scroll ได้ แยก Layer หมวดหมู่' },
+  { v: '1.6', date: '18 พ.ค. 68', note: 'เพิ่ม sync status แสดงในหัวแอพ' },
+  { v: '1.5', date: '17 พ.ค. 68', note: 'เพิ่มกราฟรายวัน + ตัวเลขบนกราฟแท่ง' },
+  { v: '1.4', date: '17 พ.ค. 68', note: 'ลิงก์รายการผ่อนกับธุรกรรมได้ + auto-fill จำนวนเงิน' },
+  { v: '1.3', date: '16 พ.ค. 68', note: 'Quick Add template รายการประจำ' },
+  { v: '1.2', date: '16 พ.ค. 68', note: 'แนบสลิปรูปภาพได้ เก็บใน Firebase Storage' },
+  { v: '1.1', date: '16 พ.ค. 68', note: 'Dark Mode + ปรับ CSS ใช้ตัวแปรสีทั้งหมด' },
+  { v: '1.0', date: '15 พ.ค. 68', note: 'เปิดตัว! Firebase sync, Google login, หมวดหมู่, บัญชี, ผ่อน, Fix cost' },
+];
+
 // ===== CONSTANTS =====
 
 const DEFAULT_CATEGORIES = {
@@ -1139,6 +1155,24 @@ function renderSettings() {
           <button class="setting-del" onclick="deleteAccount('${a}')">🗑️</button>
         </div>`).join('')}
       <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="openAddAccount()">+ เพิ่มวิธีชำระเงิน</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">เวอร์ชั่น & อัพเดท</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0 12px">
+        <span style="font-size:22px;font-weight:800;color:var(--primary)">v${APP_VERSION}</span>
+        <span style="font-size:12px;color:var(--text-secondary)">บัญชีส่วนตัว</span>
+      </div>
+      ${CHANGELOG.map((c, i) => `
+        <div style="display:flex;gap:10px;padding:8px 0;${i < CHANGELOG.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <div style="min-width:36px;text-align:center">
+            <span style="font-size:11px;font-weight:800;color:var(--primary);background:var(--primary-light);padding:2px 6px;border-radius:8px">v${c.v}</span>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;color:var(--text)">${c.note}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${c.date}</div>
+          </div>
+        </div>`).join('')}
     </div>`;
 }
 
