@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 const CHANGELOG = [
+  { v: '2.4', date: '18 พ.ค. 68', note: 'กราฟรายวัน dual-axis แยก income/expense scale + Pie chart เรียงมากสุดก่อน + กดไปรายงาน + Swipe เปลี่ยนหน้า + Version header + ชื่อแอพแก้ได้' },
   { v: '2.3', date: '18 พ.ค. 68', note: 'บังคับเลือกวิธีชำระเงิน + เรียงตามใช้บ่อยขึ้นก่อน' },
   { v: '2.2', date: '18 พ.ค. 68', note: 'แก้บั๊ก Settings ลบ/เพิ่มไม่ทำงาน (onclick string พัง)' },
   { v: '2.1', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม ✏️ เปลี่ยนชื่อหมวดหมู่ + อัพเดทรายการเก่าทั้งหมดอัตโนมัติ' },
@@ -69,6 +70,7 @@ function applyDefaults(data) {
   if (!data.cycleDay)             data.cycleDay       = 1;
   if (data.darkMode === undefined) data.darkMode      = false;
   if (!data.recurringItems)       data.recurringItems = [];
+  if (!data.appName)              data.appName        = 'บัญชีส่วนตัว';
 }
 
 function getData() {
@@ -201,6 +203,25 @@ function reRenderPage() {
 }
 
 // ===== DARK MODE =====
+
+function editAppName() {
+  const data = getData();
+  const cur  = data.appName || 'บัญชีส่วนตัว';
+  const name = prompt('ชื่อบัญชีของคุณ:', cur);
+  if (name === null) return;
+  const trimmed = name.trim() || cur;
+  data.appName = trimmed;
+  saveData(data);
+  updateHeaderTitle();
+}
+
+function updateHeaderTitle() {
+  const data = getData();
+  const titleEl = document.getElementById('page-title');
+  const verEl   = document.getElementById('header-version');
+  if (titleEl) titleEl.textContent = data.appName || 'บัญชีส่วนตัว';
+  if (verEl)   verEl.textContent   = 'v' + APP_VERSION;
+}
 
 function applyTheme() {
   const dark = getData().darkMode;
@@ -412,14 +433,17 @@ function navigate(page) {
   document.querySelectorAll('#bottom-nav button').forEach(b => {
     b.classList.toggle('active', b.dataset.page === page);
   });
-  const titles = {
-    dashboard: 'ภาพรวม',
-    add:      state.editingId ? 'แก้ไขรายการ' : 'เพิ่มรายการ',
-    list:     'รายการทั้งหมด',
-    charts:   'กราฟ & รายงาน',
-    settings: 'ตั้งค่า',
-  };
-  document.getElementById('page-title').textContent = titles[page] || '';
+  const isMain = ['dashboard','add','list','charts'].includes(page);
+  const titleEl = document.getElementById('page-title');
+  if (isMain) {
+    titleEl.textContent = getData().appName || 'บัญชีส่วนตัว';
+    titleEl.onclick = editAppName;
+    titleEl.style.cursor = 'pointer';
+  } else {
+    titleEl.textContent = 'ตั้งค่า';
+    titleEl.onclick = null;
+    titleEl.style.cursor = '';
+  }
   document.getElementById('settings-back').style.display = page === 'settings' ? 'flex' : 'none';
   document.getElementById('settings-btn').style.display  = page === 'settings' ? 'none' : 'flex';
 
@@ -495,13 +519,18 @@ function renderMiniChart(txs) {
   txs.filter(t => t.type === 'expense').forEach(t => {
     byCat[t.category] = (byCat[t.category] || 0) + t.amount;
   });
-  const labels = Object.keys(byCat);
-  if (!labels.length) { canvas.style.display = 'none'; noMsg.style.display = 'block'; return; }
+  const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) { canvas.style.display = 'none'; noMsg.style.display = 'block'; return; }
   canvas.style.display = ''; noMsg.style.display = 'none';
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = () => navigate('charts');
   if (window._miniChart) window._miniChart.destroy();
   window._miniChart = new Chart(canvas, {
     type: 'doughnut',
-    data: { labels, datasets: [{ data: labels.map(l => byCat[l]), backgroundColor: PALETTE, borderWidth: 0 }] },
+    data: {
+      labels: sorted.map(e => e[0]),
+      datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETTE, borderWidth: 0 }]
+    },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } }, datalabels: { display: false } }
@@ -852,20 +881,19 @@ function renderDailyChart() {
   const calcW = Math.max(minW, allDays.length * 44 + 60);
   wrap.style.width = calcW + 'px';
 
-  // Build datasets
+  // Build datasets — income uses RIGHT axis, expense uses LEFT axis
   const datasets = [];
-  // Income bar (not stacked — separate stack group)
   datasets.push({
     label: 'รายรับ',
     data: allDays.map(d => byDayInc[d] || 0),
-    backgroundColor: '#00C85366',
+    backgroundColor: '#00C85344',
     borderColor: '#00C853',
     borderWidth: 1.5,
     borderRadius: 3,
     stack: 'income',
+    yAxisID: 'yIncome',
     order: 0,
   });
-  // Expense datasets stacked by category
   expCats.forEach((cat, i) => {
     datasets.push({
       label: cat,
@@ -875,6 +903,7 @@ function renderDailyChart() {
       borderWidth: 1,
       borderRadius: i === expCats.length - 1 ? 3 : 0,
       stack: 'expense',
+      yAxisID: 'yExp',
       order: 1,
     });
   });
@@ -886,20 +915,24 @@ function renderDailyChart() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { font: { size: 11 }, boxWidth: 12, padding: 8 }
-        },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ฿${ctx.parsed.y.toLocaleString()}`
-          }
-        },
+        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ฿${ctx.parsed.y.toLocaleString()}` } },
         datalabels: { display: false }
       },
       scales: {
         x: { ticks: { font: { size: 11 } } },
-        y: { beginAtZero: true, ticks: { callback: v => _shortNum(v) || '0', font: { size: 11 } } }
+        yExp: {
+          type: 'linear', position: 'left', beginAtZero: true,
+          ticks: { callback: v => _shortNum(v) || '0', font: { size: 10 }, color: '#FF1744' },
+          grid: { color: 'rgba(0,0,0,.06)' },
+          title: { display: true, text: 'รายจ่าย', color: '#FF1744', font: { size: 10 } }
+        },
+        yIncome: {
+          type: 'linear', position: 'right', beginAtZero: true,
+          ticks: { callback: v => _shortNum(v) || '0', font: { size: 10 }, color: '#00C853' },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'รายรับ', color: '#00C853', font: { size: 10 } }
+        }
       },
       layout: { padding: { top: 8, bottom: 4 } }
     }
@@ -1625,6 +1658,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Start
   navigate('dashboard');
+  updateHeaderTitle();
+
+  // Swipe navigation
+  const mainEl = document.getElementById('main');
+  const swipePages = ['dashboard', 'add', 'list', 'charts'];
+  let _swipeX = 0;
+  mainEl.addEventListener('touchstart', e => { _swipeX = e.touches[0].clientX; }, { passive: true });
+  mainEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _swipeX;
+    if (Math.abs(dx) < 60) return;
+    const cur = swipePages.indexOf(state.page);
+    if (cur === -1) return;
+    if (dx < -60 && cur < swipePages.length - 1) navigate(swipePages[cur + 1]);
+    if (dx >  60 && cur > 0)                     navigate(swipePages[cur - 1]);
+  }, { passive: true });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

@@ -45,11 +45,14 @@
 
   <header id="header">
     <button id="settings-back" style="display:none;width:40px;height:40px;background:none;border:none;cursor:pointer;font-size:22px;align-items:center;justify-content:center;">‹</button>
-    <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-      <h1 id="page-title">ภาพรวม</h1>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:0">
+      <h1 id="page-title" id="app-name-title" onclick="editAppName()" style="cursor:pointer">ภาพรวม</h1>
       <div id="sync-status" class="sync-status">☁️ sync แล้ว</div>
     </div>
-    <button id="settings-btn" style="display:flex;width:40px;height:40px;background:none;border:none;cursor:pointer;font-size:22px;align-items:center;justify-content:center;">⚙️</button>
+    <div style="display:flex;align-items:center;gap:2px">
+      <span id="header-version" style="font-size:10px;font-weight:700;color:var(--primary);opacity:.7"></span>
+      <button id="settings-btn" style="display:flex;width:40px;height:40px;background:none;border:none;cursor:pointer;font-size:22px;align-items:center;justify-content:center;">⚙️</button>
+    </div>
   </header>
 
   <main id="main">
