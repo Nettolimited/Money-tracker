@@ -207,11 +207,13 @@
           </div>
         </div>
         <div class="card">
-          <div class="section-title">รายจ่ายรายวัน — เดือนที่เลือก</div>
-          <div style="position:relative;height:200px">
-            <canvas id="daily-chart"></canvas>
+          <div class="section-title">รายรับ/รายจ่ายรายวัน — เดือนที่เลือก</div>
+          <div id="daily-chart-scroll" class="daily-chart-scroll">
+            <div id="daily-chart-wrap" style="position:relative;height:280px;min-width:100%">
+              <canvas id="daily-chart"></canvas>
+            </div>
           </div>
-          <div id="no-daily-msg" style="display:none;text-align:center;padding:20px;color:#9E9E9E;font-size:14px">ยังไม่มีรายจ่าย</div>
+          <div id="no-daily-msg" style="display:none;text-align:center;padding:20px;color:#9E9E9E;font-size:14px">ยังไม่มีข้อมูล</div>
         </div>
         <div class="card">
           <div class="section-title">รายจ่ายตามหมวดหมู่เดือนที่เลือก</div>

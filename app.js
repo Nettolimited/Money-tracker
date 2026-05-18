@@ -701,51 +701,91 @@ function renderBarChart() {
 function renderDailyChart() {
   const canvas = document.getElementById('daily-chart');
   const noMsg  = document.getElementById('no-daily-msg');
-  const { transactions } = getData();
+  const wrap   = document.getElementById('daily-chart-wrap');
+  const { transactions, categories } = getData();
   const { start, end } = getMonthRange(state.chartMonth, state.chartYear);
   const txs = transactions.filter(t => { const d = new Date(t.date); return d >= start && d <= end; });
 
-  const byDay = {};
-  txs.forEach(t => {
-    const day = parseInt(t.date.split('-')[2]);
-    if (!byDay[day]) byDay[day] = { inc: 0, exp: 0 };
-    if (t.type === 'income') byDay[day].inc += t.amount;
-    else byDay[day].exp += t.amount;
-  });
-
-  const days = Object.keys(byDay).map(Number).sort((a, b) => a - b);
-  if (!days.length) {
+  if (!txs.length) {
     canvas.style.display = 'none'; noMsg.style.display = 'block';
     if (window._dailyChart) { window._dailyChart.destroy(); window._dailyChart = null; }
     return;
   }
   canvas.style.display = ''; noMsg.style.display = 'none';
+
+  // Collect all expense categories that appear this month
+  const expCats = [...new Set(txs.filter(t => t.type === 'expense').map(t => t.category))];
+
+  // Build per-day totals
+  const allDays = [...new Set(txs.map(t => parseInt(t.date.split('-')[2])))].sort((a,b) => a-b);
+  const byDayInc = {};
+  const byDayCat = {}; // byDayCat[cat][day]
+  expCats.forEach(c => { byDayCat[c] = {}; });
+  txs.forEach(t => {
+    const day = parseInt(t.date.split('-')[2]);
+    if (t.type === 'income') {
+      byDayInc[day] = (byDayInc[day] || 0) + t.amount;
+    } else {
+      if (!byDayCat[t.category]) byDayCat[t.category] = {};
+      byDayCat[t.category][day] = (byDayCat[t.category][day] || 0) + t.amount;
+    }
+  });
+
+  // Dynamic width: 44px per day, min fills container
+  const minW = document.getElementById('daily-chart-scroll').clientWidth || 320;
+  const calcW = Math.max(minW, allDays.length * 44 + 60);
+  wrap.style.width = calcW + 'px';
+
+  // Build datasets
+  const datasets = [];
+  // Income bar (not stacked — separate stack group)
+  datasets.push({
+    label: 'รายรับ',
+    data: allDays.map(d => byDayInc[d] || 0),
+    backgroundColor: '#00C85366',
+    borderColor: '#00C853',
+    borderWidth: 1.5,
+    borderRadius: 3,
+    stack: 'income',
+    order: 0,
+  });
+  // Expense datasets stacked by category
+  expCats.forEach((cat, i) => {
+    datasets.push({
+      label: cat,
+      data: allDays.map(d => byDayCat[cat][d] || 0),
+      backgroundColor: PALETTE[i % PALETTE.length] + 'CC',
+      borderColor:     PALETTE[i % PALETTE.length],
+      borderWidth: 1,
+      borderRadius: i === expCats.length - 1 ? 3 : 0,
+      stack: 'expense',
+      order: 1,
+    });
+  });
+
   if (window._dailyChart) window._dailyChart.destroy();
   window._dailyChart = new Chart(canvas, {
     type: 'bar',
-    data: {
-      labels: days.map(d => d + ''),
-      datasets: [
-        { label: 'รายรับ',  data: days.map(d => byDay[d].inc), backgroundColor: '#00C85388', borderColor: '#00C853', borderWidth: 1, borderRadius: 3 },
-        { label: 'รายจ่าย', data: days.map(d => byDay[d].exp), backgroundColor: '#FF174488', borderColor: '#FF1744', borderWidth: 1, borderRadius: 3 },
-      ]
-    },
+    data: { labels: allDays.map(d => d + ''), datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top' },
-        datalabels: {
-          anchor: 'end', align: 'end', offset: -2,
-          font: { size: 8, weight: '700' },
-          color: '#555',
-          formatter: _shortNum
-        }
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 11 }, boxWidth: 12, padding: 8 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ฿${ctx.parsed.y.toLocaleString()}`
+          }
+        },
+        datalabels: { display: false }
       },
       scales: {
-        x: { ticks: { font: { size: 10 } } },
-        y: { beginAtZero: true, ticks: { callback: v => '฿' + v.toLocaleString() } }
+        x: { ticks: { font: { size: 11 } } },
+        y: { beginAtZero: true, ticks: { callback: v => _shortNum(v) || '0', font: { size: 11 } } }
       },
-      layout: { padding: { top: 18 } }
+      layout: { padding: { top: 8, bottom: 4 } }
     }
   });
 }
