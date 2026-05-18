@@ -782,7 +782,7 @@ function renderList() {
     .sort(([a], [b]) => new Date(b) - new Date(a))
     .map(([date, items]) => `
       <div class="date-group-header">${fmtDate(date)}</div>
-      ${items.map(txHTML).join('')}
+      ${items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(txHTML).join('')}
     `).join('');
 }
 
