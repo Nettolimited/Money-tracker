@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 const CHANGELOG = [
+  { v: '2.0', date: '18 พ.ค. 68', note: 'แก้บั๊กหลัก: Firebase ไม่รับ "/" ในชื่อหมวดหมู่ (กาแฟ/น้ำหวาน) ทำให้ sync ไม่ได้มาตลอด!' },
   { v: '1.9', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม Force Pull/Push sync + แก้บั๊ก sync ช้า' },
   { v: '1.8', date: '18 พ.ค. 68', note: 'ล้างฟอร์มหลังบันทึก + toast แจ้งเตือน + scroll กลับบน' },
   { v: '1.7', date: '18 พ.ค. 68', note: 'กราฟรายวันใหญ่ขึ้น scroll ได้ แยก Layer หมวดหมู่' },
@@ -102,7 +103,7 @@ async function forcePullFromFirebase() {
   try {
     const snap = await window._db.ref('appData').once('value');
     if (snap.exists()) {
-      _appData = snap.val();
+      _appData = fromFirebase(snap.val());
       applyDefaults(_appData);
       localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
       setSyncStatus('ok');
@@ -125,7 +126,7 @@ async function forcePushToFirebase() {
   setSyncStatus('saving');
   try {
     const data = getData();
-    await window._db.ref('appData').set(data);
+    await window._db.ref('appData').set(toFirebase(data));
     setSyncStatus('ok');
     showToast('✓ อัพข้อมูลขึ้น Cloud แล้ว! ' + (data.transactions||[]).length + ' รายการ');
   } catch(e) {
@@ -142,13 +143,45 @@ function setSyncStatus(state) {
   else                      { el.textContent = '⚠️ ไม่ได้ sync';   el.className = 'sync-status offline'; }
 }
 
+// Firebase keys can't contain . # $ / [ ]
+// budgets & fixcostChecks use category/item names as keys — encode before save
+function _encodeKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  Object.entries(obj).forEach(([k, v]) => {
+    out[encodeURIComponent(k)] = v;
+  });
+  return out;
+}
+function _decodeKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  Object.entries(obj).forEach(([k, v]) => {
+    out[decodeURIComponent(k)] = v;
+  });
+  return out;
+}
+function toFirebase(data) {
+  return { ...data,
+    budgets:      _encodeKeys(data.budgets      || {}),
+    fixcostChecks:_encodeKeys(data.fixcostChecks|| {}),
+  };
+}
+function fromFirebase(data) {
+  if (!data) return data;
+  return { ...data,
+    budgets:      _decodeKeys(data.budgets      || {}),
+    fixcostChecks:_decodeKeys(data.fixcostChecks|| {}),
+  };
+}
+
 function saveData(data) {
   _appData = data;
   _lastSaveTime = Date.now();
   localStorage.setItem('financeApp_v1', JSON.stringify(data));
   if (window._db) {
     setSyncStatus('saving');
-    window._db.ref('appData').set(data)
+    window._db.ref('appData').set(toFirebase(data))
       .then(() => setSyncStatus('ok'))
       .catch(() => setSyncStatus('offline'));
   } else {
@@ -265,7 +298,7 @@ async function initSync() {
       if (firstFire) {
         firstFire = false;
         if (snap.exists()) {
-          _appData = snap.val();
+          _appData = fromFirebase(snap.val());
           applyDefaults(_appData);
           localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
           setSyncStatus('ok');
@@ -273,7 +306,7 @@ async function initSync() {
         } else {
           _lastSaveTime = Date.now();
           const local = getData();
-          window._db.ref('appData').set(local)
+          window._db.ref('appData').set(toFirebase(local))
             .then(() => setSyncStatus('ok'))
             .catch(() => setSyncStatus('offline'));
         }
@@ -282,7 +315,7 @@ async function initSync() {
       }
       if (Date.now() - _lastSaveTime < 3000) return;
       if (!snap.exists()) return;
-      _appData = snap.val();
+      _appData = fromFirebase(snap.val());
       applyDefaults(_appData);
       localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
       reRenderPage();
