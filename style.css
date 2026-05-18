@@ -240,6 +240,7 @@ body {
   background: var(--primary); color: white; border-color: var(--primary);
 }
 .account-chip:active { opacity: .8; }
+.chip-freq { display:inline-block; margin-left:5px; font-size:10px; font-weight:800; opacity:.55; }
 
 /* ---- BUTTONS ---- */
 .btn-primary {

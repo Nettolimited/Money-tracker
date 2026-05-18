@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 const CHANGELOG = [
+  { v: '2.3', date: '18 พ.ค. 68', note: 'บังคับเลือกวิธีชำระเงิน + เรียงตามใช้บ่อยขึ้นก่อน' },
   { v: '2.2', date: '18 พ.ค. 68', note: 'แก้บั๊ก Settings ลบ/เพิ่มไม่ทำงาน (onclick string พัง)' },
   { v: '2.1', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม ✏️ เปลี่ยนชื่อหมวดหมู่ + อัพเดทรายการเก่าทั้งหมดอัตโนมัติ' },
   { v: '2.0', date: '18 พ.ค. 68', note: 'แก้บั๊กหลัก: Firebase ไม่รับ "/" ในชื่อหมวดหมู่ (กาแฟ/น้ำหวาน) ทำให้ sync ไม่ได้มาตลอด!' },
@@ -569,10 +570,15 @@ function updateCatGrid() {
 }
 
 function updateAccountChips() {
-  const { accounts } = getData();
-  document.getElementById('account-chips').innerHTML = accounts.map(a => `
-    <button class="account-chip ${state.addAccount === a ? 'selected' : ''}" onclick="selectAccount('${a}')">
-      ${a}
+  const { accounts, transactions } = getData();
+  // Count usage per account
+  const freq = {};
+  transactions.forEach(t => { if (t.account) freq[t.account] = (freq[t.account] || 0) + 1; });
+  // Sort by frequency desc, then original order
+  const sorted = [...accounts].sort((a, b) => (freq[b] || 0) - (freq[a] || 0));
+  document.getElementById('account-chips').innerHTML = sorted.map(a => `
+    <button class="account-chip ${state.addAccount === a ? 'selected' : ''}" data-name="${a}" onclick="selectAccount(this.dataset.name)">
+      ${a}${freq[a] ? '<span class="chip-freq">'+freq[a]+'</span>' : ''}
     </button>`).join('');
 }
 
@@ -600,7 +606,7 @@ function onInstallSelect(val) {
 }
 
 function selectCat(name)     { state.addCat     = name; updateCatGrid(); }
-function selectAccount(name) { state.addAccount = (state.addAccount === name) ? null : name; updateAccountChips(); }
+function selectAccount(name) { state.addAccount = name; updateAccountChips(); }
 
 function saveTransaction() {
   const rawAmt = document.getElementById('form-amount').value.replace(/,/g, '');
@@ -610,6 +616,7 @@ function saveTransaction() {
 
   if (!amount || amount <= 0) { alert('กรุณาใส่จำนวนเงินให้ถูกต้อง'); return; }
   if (!state.addCat)          { alert('กรุณาเลือกหมวดหมู่'); return; }
+  if (!state.addAccount)      { alert('กรุณาเลือกวิธีการชำระเงิน'); return; }
   if (!date)                  { alert('กรุณาเลือกวันที่'); return; }
 
   const slipFile = _slipFile;
