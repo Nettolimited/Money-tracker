@@ -65,12 +65,25 @@ function getData() {
   }
 }
 
+function setSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  if (state === 'saving') { el.textContent = '🔄 กำลัง sync...'; el.className = 'sync-status syncing'; }
+  else if (state === 'ok')  { el.textContent = '☁️ sync แล้ว';    el.className = 'sync-status synced'; }
+  else                      { el.textContent = '⚠️ ไม่ได้ sync';   el.className = 'sync-status offline'; }
+}
+
 function saveData(data) {
   _appData = data;
   _lastSaveTime = Date.now();
   localStorage.setItem('financeApp_v1', JSON.stringify(data));
   if (window._db) {
-    window._db.ref('appData').set(data).catch(() => {});
+    setSyncStatus('saving');
+    window._db.ref('appData').set(data)
+      .then(() => setSyncStatus('ok'))
+      .catch(() => setSyncStatus('offline'));
+  } else {
+    setSyncStatus('offline');
   }
 }
 
@@ -185,10 +198,13 @@ async function initSync() {
           _appData = snap.val();
           applyDefaults(_appData);
           localStorage.setItem('financeApp_v1', JSON.stringify(_appData));
+          setSyncStatus('ok');
         } else {
           _lastSaveTime = Date.now();
           const local = getData();
-          window._db.ref('appData').set(local).catch(() => {});
+          window._db.ref('appData').set(local)
+            .then(() => setSyncStatus('ok'))
+            .catch(() => setSyncStatus('offline'));
         }
         done();
         return;
