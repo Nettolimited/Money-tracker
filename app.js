@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 const CHANGELOG = [
+  { v: '2.2', date: '18 พ.ค. 68', note: 'แก้บั๊ก Settings ลบ/เพิ่มไม่ทำงาน (onclick string พัง)' },
   { v: '2.1', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม ✏️ เปลี่ยนชื่อหมวดหมู่ + อัพเดทรายการเก่าทั้งหมดอัตโนมัติ' },
   { v: '2.0', date: '18 พ.ค. 68', note: 'แก้บั๊กหลัก: Firebase ไม่รับ "/" ในชื่อหมวดหมู่ (กาแฟ/น้ำหวาน) ทำให้ sync ไม่ได้มาตลอด!' },
   { v: '1.9', date: '18 พ.ค. 68', note: 'เพิ่มปุ่ม Force Pull/Push sync + แก้บั๊ก sync ช้า' },
@@ -1165,8 +1166,8 @@ function renderSettings() {
           <span style="font-size:20px">${c.emoji}</span>
           <span class="setting-name">${c.name}</span>
           <div style="display:flex;gap:6px">
-            <button class="setting-del" onclick="openRenameCategory('income','${c.name.replace(/'/g,"\\'")}')">✏️</button>
-            <button class="setting-del" onclick="deleteCategory('income','${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+            <button class="setting-del" data-type="income" data-name="${c.name}" onclick="openRenameCategory(this.dataset.type,this.dataset.name)">✏️</button>
+            <button class="setting-del" data-type="income" data-name="${c.name}" onclick="deleteCategory(this.dataset.type,this.dataset.name)">🗑️</button>
           </div>
         </div>`).join('')}
       <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="openAddCat('income')">+ เพิ่มหมวดหมู่รายรับ</button>
@@ -1179,8 +1180,8 @@ function renderSettings() {
           <span style="font-size:20px">${c.emoji}</span>
           <span class="setting-name">${c.name}</span>
           <div style="display:flex;gap:6px">
-            <button class="setting-del" onclick="openRenameCategory('expense','${c.name.replace(/'/g,"\\'")}')">✏️</button>
-            <button class="setting-del" onclick="deleteCategory('expense','${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+            <button class="setting-del" data-type="expense" data-name="${c.name}" onclick="openRenameCategory(this.dataset.type,this.dataset.name)">✏️</button>
+            <button class="setting-del" data-type="expense" data-name="${c.name}" onclick="deleteCategory(this.dataset.type,this.dataset.name)">🗑️</button>
           </div>
         </div>`).join('')}
       <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="openAddCat('expense')">+ เพิ่มหมวดหมู่รายจ่าย</button>
@@ -1192,7 +1193,7 @@ function renderSettings() {
         <div class="setting-item">
           <span style="font-size:20px">💳</span>
           <span class="setting-name">${a}</span>
-          <button class="setting-del" onclick="deleteAccount('${a}')">🗑️</button>
+          <button class="setting-del" data-name="${a}" onclick="deleteAccount(this.dataset.name)">🗑️</button>
         </div>`).join('')}
       <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="openAddAccount()">+ เพิ่มวิธีชำระเงิน</button>
     </div>
