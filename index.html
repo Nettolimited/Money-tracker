@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>บัญชีส่วนตัว</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#6C63FF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="บัญชีส่วนตัว">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyDAfnW-yGixHu6EfpTWD50dqGdVHvYkg-o",
+      authDomain: "money-tracker-660d2.firebaseapp.com",
+      databaseURL: "https://money-tracker-660d2-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "money-tracker-660d2",
+      storageBucket: "money-tracker-660d2.firebasestorage.app",
+      messagingSenderId: "260484069502",
+      appId: "1:260484069502:web:407828ee44414b8727402f"
+    });
+    window._db = firebase.database();
+  </script>
+</head>
+<body>
+<!-- Login screen -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:#F5F5F5;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
+  <div style="font-size:56px">💰</div>
+  <div style="font-size:20px;font-weight:800;color:#212121">บัญชีส่วนตัว</div>
+  <button id="google-signin-btn" onclick="doGoogleLogin()" style="display:flex;align-items:center;gap:10px;padding:14px 24px;background:white;border:1.5px solid #E0E0E0;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+    <img src="https://www.google.com/favicon.ico" width="20" height="20"> เข้าสู่ระบบด้วย Google
+  </button>
+  <div id="login-msg" style="font-size:13px;color:#9E9E9E"></div>
+</div>
+
+<div id="app" style="display:none">
+
+  <header id="header">
+    <button id="settings-back" style="display:none;width:40px;height:40px;background:none;border:none;cursor:pointer;font-size:22px;align-items:center;justify-content:center;">‹</button>
+    <h1 id="page-title">ภาพรวม</h1>
+    <button id="settings-btn" style="display:flex;width:40px;height:40px;background:none;border:none;cursor:pointer;font-size:22px;align-items:center;justify-content:center;">⚙️</button>
+  </header>
+
+  <main id="main">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div id="page-dashboard" class="page active">
+      <div class="month-selector">
+        <button id="dash-prev">&#8249;</button>
+        <span id="dash-month"></span>
+        <button id="dash-next">&#8250;</button>
+      </div>
+
+      <!-- Forecast strip -->
+      <div id="dash-forecast" class="forecast-strip">
+        <div class="forecast-item">
+          <div class="forecast-label">เฉลี่ย/วัน</div>
+          <div class="forecast-val" id="dash-daily-avg">฿0</div>
+        </div>
+        <div class="forecast-divider"></div>
+        <div class="forecast-item">
+          <div class="forecast-label">คาดสิ้นเดือน</div>
+          <div class="forecast-val" id="dash-forecast-amt">฿0</div>
+        </div>
+        <div class="forecast-divider"></div>
+        <div class="forecast-item">
+          <div class="forecast-label">วันที่ผ่านแล้ว</div>
+          <div class="forecast-val" id="dash-days-passed">-</div>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card balance-card">
+          <div class="summary-label">ยอดคงเหลือ</div>
+          <div class="summary-amount" id="dash-balance">฿0.00</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label income-color">รายรับ</div>
+          <div class="summary-amount income-color" id="dash-income">฿0.00</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label expense-color">รายจ่าย</div>
+          <div class="summary-amount expense-color" id="dash-expense">฿0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">รายจ่ายตามหมวดหมู่</div>
+        <div style="position:relative;height:180px">
+          <canvas id="dash-chart"></canvas>
+        </div>
+        <div id="dash-no-expense" style="display:none;text-align:center;padding:20px;color:#9E9E9E;font-size:14px">ยังไม่มีรายจ่ายเดือนนี้</div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">รายการล่าสุด</div>
+        <div id="dash-recent"></div>
+      </div>
+    </div>
+
+    <!-- ===== ADD / EDIT ===== -->
+    <div id="page-add" class="page">
+      <div id="quick-add-section" class="card" style="display:none">
+        <div class="section-label" style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:6px">⚡ Quick Add</div>
+        <div id="quick-chips"></div>
+      </div>
+      <div class="card">
+        <div class="type-toggle">
+          <button id="toggle-expense" class="active expense">รายจ่าย 💸</button>
+          <button id="toggle-income">รายรับ 💰</button>
+        </div>
+
+        <div style="text-align:center;color:#9E9E9E;font-size:13px;margin-bottom:4px">จำนวนเงิน (บาท)</div>
+        <input type="text" inputmode="decimal" id="form-amount" class="amount-input" placeholder="0.00">
+
+        <div class="form-group">
+          <label class="form-label">หมวดหมู่</label>
+          <div id="cat-grid" class="cat-grid"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">บัญชี / บัตร</label>
+          <div id="account-chips" class="account-chips"></div>
+        </div>
+
+        <div class="form-group" id="install-link-wrap" style="display:none">
+          <label class="form-label">💳 ลิงก์รายการผ่อน (ไม่บังคับ)</label>
+          <select id="install-link-select" class="form-input" onchange="onInstallSelect(this.value)"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">วันที่</label>
+          <input type="date" id="form-date" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">หมายเหตุ (ไม่บังคับ)</label>
+          <input type="text" id="form-note" class="form-input" placeholder="เช่น ข้าวกลางวัน, ค่าน้ำมัน...">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">สลิป (ไม่บังคับ)</label>
+          <div id="slip-preview-wrap" style="display:none;margin-bottom:8px">
+            <img id="slip-preview" style="max-width:100%;border-radius:8px;display:block">
+            <button type="button" onclick="removeSlip()" class="slip-remove-btn">✕ ลบรูป</button>
+          </div>
+          <button type="button" id="slip-btn" onclick="pickSlip()">📷 แนบสลิป</button>
+          <input type="file" id="slip-input" accept="image/*" style="display:none" onchange="onSlipPicked(this)">
+        </div>
+
+        <button id="save-btn" class="btn-primary">บันทึก</button>
+        <button id="delete-btn" class="btn-danger" style="display:none">ลบรายการนี้</button>
+      </div>
+    </div>
+
+    <!-- ===== LIST ===== -->
+    <div id="page-list" class="page">
+      <div class="month-selector">
+        <button id="list-prev">&#8249;</button>
+        <span id="list-month"></span>
+        <button id="list-next">&#8250;</button>
+      </div>
+      <input type="search" id="list-search" class="search-input" placeholder="🔍 ค้นหา...">
+      <div class="filter-bar">
+        <button class="filter-chip active" data-filter="all">ทั้งหมด</button>
+        <button class="filter-chip" data-filter="income">รายรับ</button>
+        <button class="filter-chip" data-filter="expense">รายจ่าย</button>
+      </div>
+      <div class="card">
+        <div id="list-container"></div>
+      </div>
+    </div>
+
+    <!-- ===== REPORTS ===== -->
+    <div id="page-charts" class="page">
+      <div class="month-selector">
+        <button id="chart-prev">&#8249;</button>
+        <span id="chart-month"></span>
+        <button id="chart-next">&#8250;</button>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="charts" onclick="switchReportsTab('charts')">📊 กราฟ</button>
+        <button class="tab-btn" data-tab="budget" onclick="switchReportsTab('budget')">🎯 งบ</button>
+        <button class="tab-btn" data-tab="install" onclick="switchReportsTab('install')">💳 ผ่อน</button>
+        <button class="tab-btn" data-tab="fixcost" onclick="switchReportsTab('fixcost')">✅ ประจำ</button>
+      </div>
+
+      <!-- Tab: Charts -->
+      <div id="tab-charts" class="tab-content">
+        <div class="card">
+          <div class="section-title">รายรับ vs รายจ่าย (6 เดือน)</div>
+          <div style="position:relative;height:220px">
+            <canvas id="bar-chart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title">รายจ่ายรายวัน — เดือนที่เลือก</div>
+          <div style="position:relative;height:200px">
+            <canvas id="daily-chart"></canvas>
+          </div>
+          <div id="no-daily-msg" style="display:none;text-align:center;padding:20px;color:#9E9E9E;font-size:14px">ยังไม่มีรายจ่าย</div>
+        </div>
+        <div class="card">
+          <div class="section-title">รายจ่ายตามหมวดหมู่เดือนที่เลือก</div>
+          <div style="position:relative;height:220px">
+            <canvas id="pie-chart"></canvas>
+          </div>
+          <div id="no-expense-msg" style="display:none;text-align:center;padding:20px;color:#9E9E9E;font-size:14px">ยังไม่มีรายจ่าย</div>
+        </div>
+        <div style="text-align:center;padding-bottom:16px">
+          <button id="export-btn" class="btn-secondary">📥 Export เป็น CSV</button>
+        </div>
+      </div>
+
+      <!-- Tab: Budget -->
+      <div id="tab-budget" class="tab-content" style="display:none">
+        <div class="card">
+          <div class="section-title">งบประมาณต่อหมวดหมู่ — กดเพื่อตั้งงบ</div>
+          <div id="budget-container"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Installments -->
+      <div id="tab-install" class="tab-content" style="display:none">
+        <div id="install-container"></div>
+        <button onclick="openInstallAdd()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการผ่อน</button>
+      </div>
+
+      <!-- Tab: Fix cost checklist -->
+      <div id="tab-fixcost" class="tab-content" style="display:none">
+        <div id="fixcost-container"></div>
+        <button onclick="openAddFixcostItem()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการประจำ</button>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS ===== -->
+    <div id="page-settings" class="page">
+      <div id="settings-container"></div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav id="bottom-nav">
+    <button data-page="dashboard" class="active">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">หน้าแรก</span>
+    </button>
+    <button data-page="add">
+      <span class="nav-icon">➕</span>
+      <span class="nav-label">เพิ่ม</span>
+    </button>
+    <button data-page="list">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">รายการ</span>
+    </button>
+    <button data-page="charts">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">รายงาน</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- ===== MODAL: Budget Edit ===== -->
+<div id="modal-budget" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-budget-title" style="font-size:16px;margin-bottom:14px">ตั้งงบประมาณ</h3>
+    <label class="form-label">งบ (บาท) — ใส่ 0 เพื่อลบงบ</label>
+    <input type="text" inputmode="decimal" id="modal-budget-input" class="form-input" placeholder="0" style="margin-top:6px">
+    <button onclick="saveBudget()" class="btn-primary" style="margin-top:14px">บันทึก</button>
+    <button onclick="closeModal('modal-budget')" class="btn-danger" style="margin-top:8px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Installment Add/Edit ===== -->
+<div id="modal-install" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-install-title" style="font-size:16px;margin-bottom:14px">เพิ่มรายการผ่อน</h3>
+
+    <div class="form-group">
+      <label class="form-label">ชื่อรายการ</label>
+      <input type="text" id="install-name" class="form-input" placeholder="เช่น Samsung S26 Ultra">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group">
+        <label class="form-label">จำนวนงวด (ทั้งหมด)</label>
+        <input type="number" id="install-total" class="form-input" placeholder="10">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ผ่อนไปแล้ว (งวด)</label>
+        <input type="number" id="install-paid" class="form-input" placeholder="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">ยอดต่องวด (บาท)</label>
+      <input type="text" inputmode="decimal" id="install-amount" class="form-input" placeholder="3,080">
+    </div>
+    <div class="form-group">
+      <label class="form-label">บัตร / บัญชี</label>
+      <select id="install-account" class="form-input"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">หมายเหตุ</label>
+      <input type="text" id="install-note" class="form-input" placeholder="">
+    </div>
+    <button onclick="saveInstall()" class="btn-primary">บันทึก</button>
+    <button id="delete-install-btn" onclick="deleteInstall()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
+    <button onclick="closeModal('modal-install')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
+  </div>
+</div>
+
+<script>
+// Seed historical data on first launch
+(function(){
+  const DEFAULT_ACCS = ['QR Code','เงินสด','KBank','KTC','TTB','Make','Krungsri NOW','Easy Pass','Spaylater','ShopeePay','SCB Easy','TRUE Money'];
+  try {
+    const existing = JSON.parse(localStorage.getItem('financeApp_v1')||'{}');
+    if (existing.transactions && existing.transactions.length > 0) {
+      // Migrate existing data — add missing fields without overwriting user data
+      let dirty = false;
+      if (!existing.cycleDay)      { existing.cycleDay      = 25;            dirty = true; }
+      if (!existing.accounts)      { existing.accounts      = DEFAULT_ACCS;  dirty = true; }
+      if (!existing.fixcostItems)  { existing.fixcostItems  = [];            dirty = true; }
+      if (!existing.fixcostChecks) { existing.fixcostChecks = {};            dirty = true; }
+      if (dirty) localStorage.setItem('financeApp_v1', JSON.stringify(existing));
+      return;
+    }
+  } catch(e) {}
+  function gid(i){ return (1700000000000+i*1000).toString(36)+Math.random().toString(36).slice(2,6); }
+  const RAW=[
+    ['2026-02-11','expense','อาหาร',135,'QR Code','ข้าว ตลาดนัด BTU'],
+    ['2026-02-11','expense','เกมส์',104,'Spaylater','Steam For Honor'],
+    ['2026-02-11','expense','อาหาร',190,'QR Code','หมูกระทะ โชคทวีศาลายา'],
+    ['2026-02-12','expense','อาหาร',60,'Make','ข้าวเจ้นอย'],
+    ['2026-02-12','expense','ของใช้',70,'QR Code','ซ่อมเสื้อผ้า'],
+    ['2026-02-12','expense','กาแฟ/น้ำหวาน',60,'QR Code','ชา Oneanother บางปู'],
+    ['2026-02-12','expense','งาน',1034,'Krungsri NOW','อุปกรณ์ทำงาน Shopee'],
+    ['2026-02-12','expense','กาแฟ/น้ำหวาน',30,'QR Code','บูลฮาวาย ริมทะเลบางปู'],
+    ['2026-02-12','expense','อาหาร',177,'QR Code','ข้าว ส้มตำบางปู'],
+    ['2026-02-12','expense','BRV',300,'KTC','น้ำมัน เติมที่บางปู'],
+    ['2026-02-12','expense','เดินทาง',40,'Easy Pass','ทางด่วน สมุทรปราการ-บางแค'],
+    ['2026-02-13','expense','อาหาร',50,'Make','ข้าว ปอกๆ'],
+    ['2026-02-13','expense','ของใช้',88,'QR Code','น้ำยาซักผ้า Top market'],
+    ['2026-02-13','expense','อาหาร',80,'Make','สตอเบอร์รี่+มะม่วง ตลาด'],
+    ['2026-02-13','expense','กาแฟ/น้ำหวาน',50,'QR Code','น้ำแตงโม ตลาด'],
+    ['2026-02-13','expense','สุขภาพ',450,'QR Code','นวด หน้าหมู่บ้าน'],
+    ['2026-02-13','expense','ของใช้',76,'QR Code','DIY กาลามัง'],
+    ['2026-02-14','expense','ของขวัญ',450,'QR Code','ดอกไม้วาเลนไทน์'],
+    ['2026-02-14','expense','อาหาร',70,'QR Code','ข้าวหมูกรอบ'],
+    ['2026-02-14','expense','กาแฟ/น้ำหวาน',20,'QR Code','ชานม'],
+    ['2026-02-14','expense','อาหาร',154,'QR Code','ปากมันหน้าม้อ'],
+    ['2026-02-15','expense','อาหาร',50,'QR Code','กระเพราตลาดเฮียใช้'],
+    ['2026-02-15','expense','อาหาร',72.5,'Make','สุกกี้รพ ธน'],
+    ['2026-02-16','expense','อาหาร',40,'QR Code','ข้าวไข่ขน แมคโคร'],
+    ['2026-02-16','expense','กาแฟ/น้ำหวาน',30,'QR Code','แตงโมปั่น แม็คโคร'],
+    ['2026-02-17','expense','BRV',492,'TTB','น้ำมัน เติมย่อย'],
+    ['2026-02-17','expense','อาหาร',60,'QR Code','ก๋วยเตี๋ยว โรงร้อน'],
+    ['2026-02-17','expense','งาน',624,'Krungsri NOW','ตัวจับราว'],
+    ['2026-02-17','expense','อาหาร',117,'QR Code','เตรียมทำอาหาร Lotus'],
+    ['2026-02-17','expense','อาหาร',65,'Make','ข้าวตรงข้ามตี๋น้อย'],
+    ['2026-02-18','expense','อาหาร',115,'QR Code','ข้าว ตลาด BTU'],
+    ['2026-02-18','expense','สุขภาพ',73,'QR Code','ถุง โลตัส'],
+    ['2026-02-18','expense','อาหาร',70,'QR Code','พริกกระเทียม ไก่โลตัส'],
+    ['2026-02-19','income','โบนัส',8625,'Make','Seagame ค่าเหรียญ'],
+    ['2026-02-19','expense','อาหาร',77.5,'Make','ข้าว ครัวบ้านตึก'],
+    ['2026-02-19','expense','กาแฟ/น้ำหวาน',45,'QR Code','น้ำ ศิลปากร'],
+    ['2026-02-19','expense','เดินทาง',354,'Make','คาเฟ่แมว กำแพงแสน'],
+    ['2026-02-19','expense','อาหาร',50,'QR Code','ข้าว แมคโคร'],
+    ['2026-02-20','expense','อาหาร',60,'QR Code','ข้าว เจ้นอย'],
+    ['2026-02-21','expense','งาน',540,'Krungsri NOW','Super clamp'],
+    ['2026-02-21','expense','งาน',1097,'Krungsri NOW','Pointer'],
+    ['2026-02-21','expense','Fix cost',638.77,'Krungsri NOW','AIS อินเตอร์เน็ต'],
+    ['2026-02-21','expense','อาหาร',124,'QR Code','ปากมัน หน้าม้อ'],
+    ['2026-02-22','expense','อาหาร',156.75,'QR Code','ทำอาหาร'],
+    ['2026-02-23','expense','BRV',588.5,'Make','เข้าศูนย์ เช็คไฟ Engine'],
+    ['2026-02-23','expense','ของขวัญ',3000,'Make','วันเกิดยาย'],
+    ['2026-02-23','expense','BRV',295,'TTB','น้ำมัน'],
+    ['2026-02-23','expense','ประกัน',1168,'KTC','ประกัน AIA'],
+    ['2026-02-23','expense','BRV',1083,'KTC','3M'],
+    ['2026-02-23','income','โบนัส',2000,'Make','ทองแบ่ง จากวันปีใหม่'],
+    ['2026-02-24','expense','Fix cost',672,'Krungsri NOW','ESim KlooK'],
+    ['2026-02-24','expense','อาหาร',110,'QR Code','ข้าวมันไก่ ไก่ย่างเที่ยงคืน'],
+    ['2026-02-25','expense','อาหาร',240,'QR Code','ข้าว ตลาด BTU'],
+    ['2026-02-25','expense','อื่นๆ',40,'QR Code','ส่งของ เคลม Logitech Spotlight'],
+    ['2026-02-25','expense','กาแฟ/น้ำหวาน',49,'QR Code','โยโกรุโตะ ตลาดธน'],
+    ['2026-02-25','expense','สุขภาพ',440,'TTB','Watson เตรียมไปตุรกี'],
+    ['2026-02-25','expense','Lifestyle',390,'TTB','เสื้อ Heather Uniqlo'],
+    ['2026-02-25','expense','สุขภาพ',110,'Make','เข็ม IV ดริปผิว'],
+    ['2026-02-26','expense','อาหาร',488,'Make','หมูกระทะ ทวีโชค'],
+    ['2026-02-26','expense','เดินทาง',420,'KTC','Grab ไปสุวรรณภูมิ'],
+    ['2026-02-26','expense','กาแฟ/น้ำหวาน',20,'QR Code','น้ำ สุวรรณภูมิ'],
+    ['2026-02-27','income','เงินเดือน',28960,'KBank','เงินเดือน'],
+    ['2026-02-27','expense','Lifestyle',85,'QR Code','Netflix'],
+    ['2026-02-27','expense','BRV',1084,'KTC','3M Absolute'],
+    ['2026-02-27','expense','Lifestyle',1704,'KTC','Instra X5'],
+    ['2026-02-27','expense','Lifestyle',1700,'KTC','Vivo'],
+    ['2026-02-27','expense','Fix cost',893,'Krungsri NOW','ค่าไฟ'],
+    ['2026-02-27','expense','Fix cost',515,'ShopeePay','NT'],
+    ['2026-03-01','expense','Lifestyle',305,'SCB Easy','หวย แทงเว็บ'],
+    ['2026-03-01','income','โอนเงินเข้า',400,'QR Code','แฟนโอนคืนหมูกระทะ'],
+    ['2026-03-02','expense','Fix cost',99,'TTB','VPN Bull VPN'],
+    ['2026-03-02','expense','ประกัน',1168,'KTC','AIA'],
+    ['2026-03-02','expense','Fix cost',3000,'QR Code','ค่าบ้าน'],
+    ['2026-03-02','expense','อาหาร',278,'Yourtip','ซื้อขนม'],
+    ['2026-03-05','expense','อาหาร',172,'Yourtip','ขนมคาฟู'],
+    ['2026-03-05','expense','อาหาร',320,'Yourtip','ไอติมตุรกี เดินชายหาด'],
+    ['2026-03-05','expense','สุขภาพ',415,'Make','ยาคุม'],
+    ['2026-03-06','expense','ของขวัญ',1145,'Yourtip','ของฝาก'],
+    ['2026-03-08','expense','กาแฟ/น้ำหวาน',330,'QR Code','ขนมคาเฟ Mulberry'],
+    ['2026-03-09','expense','กาแฟ/น้ำหวาน',55,'QR Code','บ๊วย แก้งวง'],
+    ['2026-03-09','expense','ของขวัญ',100,'QR Code','ลูกโอบ'],
+    ['2026-03-09','expense','งาน',850,'TTB','SD Card 128 Advice'],
+    ['2026-03-09','expense','BRV',500,'TTB','น้ำมัน'],
+    ['2026-03-09','expense','Lifestyle',2000,'Krungsri NOW','จองโทรศัพท์ Ais'],
+    ['2026-03-10','expense','อาหาร',234.5,'Make','หมูกระทะ ทวีโชค'],
+    ['2026-03-10','expense','ของใช้',190,'Make','Kai cleanser Shopee'],
+    ['2026-03-10','expense','Lifestyle',1910,'Krungsri NOW','Case + Film'],
+    ['2026-03-10','expense','อาหาร',50,'QR Code','ข้าว โรงร้อน'],
+    ['2026-03-10','expense','กาแฟ/น้ำหวาน',30,'QR Code','ไวท์มอล โรงร้อน'],
+    ['2026-03-11','expense','อาหาร',50,'QR Code','ข้าว โรงร้อน'],
+    ['2026-03-11','expense','สุขภาพ',500,'QR Code','นวดแฟน'],
+    ['2026-03-12','expense','กาแฟ/น้ำหวาน',25,'TRUE Money','น้ำดื่ม ก่อน Toeic'],
+    ['2026-03-12','expense','อื่นๆ',100,'เงินสด','EMS ส่งผลโทอิค'],
+    ['2026-03-12','expense','งาน',1800,'TTB','สอบ Toeic'],
+    ['2026-03-12','expense','อาหาร',161,'QR Code','Eat am are'],
+    ['2026-03-13','expense','กาแฟ/น้ำหวาน',15,'QR Code','น้ำสไปรท์ หมาลาตั้งสิน'],
+    ['2026-03-13','expense','กาแฟ/น้ำหวาน',35,'QR Code','เครป ตั้งสิน'],
+    ['2026-03-13','expense','อาหาร',50,'QR Code','กะเพราหมูสับเต้าหู้โรงร้อน'],
+    ['2026-03-13','expense','อาหาร',87,'QR Code','หมาลา ตั้งสิน'],
+    ['2026-03-14','expense','อาหาร',314,'QR Code','ซื้ออาหารและน้ำ แมคโคร'],
+    ['2026-03-15','expense','อาหาร',70,'Make','ส้มตำ หน้าหมู่บ้าน'],
+    ['2026-03-15','expense','อาหาร',145,'TTB','อาหารกลางวัน Grab'],
+    ['2026-03-15','expense','อาหาร',164,'QR Code','เครื่องปรุง Lotus'],
+    ['2026-03-16','expense','อาหาร',75,'QR Code','ก๋วยเตี๋ยว ร้านลับคลองเนียทราย'],
+    ['2026-03-16','expense','อาหาร',130,'Make','ข้าวหน้าม้อ ปากมัน'],
+    ['2026-03-17','expense','อาหาร',55,'Make','ก๋วยเตี๋ยว ปอกๆ'],
+    ['2026-03-17','expense','Fix cost',822,'Krungsri NOW','AIS รอบ กพ-มีนา'],
+    ['2026-03-17','expense','อาหาร',40,'QR Code','ข้าวมันไก่ เซเวนดอนหวาย'],
+    ['2026-03-18','expense','BRV',1150,'TTB','น้ำมัน PT สาย3'],
+    ['2026-03-18','expense','อาหาร',40,'QR Code','ข้าว ไข่เจียวฟู'],
+    ['2026-03-18','expense','อาหาร',79.5,'Make','KFC Grab'],
+    ['2026-03-19','expense','อาหาร',80,'TTB','ข้าวกระเพรา Line man'],
+    ['2026-03-19','expense','อาหาร',50,'QR Code','ข้าวเย็น แฟนซื้อจากท็อป'],
+    ['2026-03-19','expense','ของใช้',80,'QR Code','น้ำยาปรับผ้านุ่ม แฟนซื้อจากท็อป'],
+    ['2026-03-20','expense','อาหาร',79,'KTC','ข้าว Shopee food'],
+    ['2026-03-20','expense','อาหาร',48,'TRUE Money','ขนมปัง 7'],
+    ['2026-03-21','expense','อาหาร',102,'Make','ข้าวหน้าม้อ ปากมันหน้าม้อ'],
+    ['2026-03-21','expense','อาหาร',40,'QR Code','เซงซิมอี้ หน้าม้อ'],
+    ['2026-03-21','expense','BRV',400,'Make','ล้างรถ The time'],
+    ['2026-03-21','expense','อาหาร',40,'QR Code','ขาหมู พี่ภาพ'],
+    ['2026-03-22','expense','กาแฟ/น้ำหวาน',85,'QR Code','Punthai สระเศรษฐี'],
+    ['2026-03-24','expense','อาหาร',109,'TTB','ราดหน้า line man'],
+    ['2026-03-24','expense','อาหาร',40,'QR Code','ข้าวราดแกง โรงร้อน'],
+    ['2026-03-24','expense','อาหาร',50,'QR Code','กระเพรา โรงเย็น'],
+    ['2026-03-24','expense','อาหาร',80,'QR Code','หมาลา เฮียใช้'],
+    ['2026-03-24','expense','อาหาร',55,'QR Code','ข้าวกระเพรา เฮียใช้'],
+    ['2026-03-25','expense','อาหาร',300,'QR Code','Kofuku Salaya'],
+    ['2026-03-25','expense','เดินทาง',120,'TTB','หนัง บีเวอร์'],
+    ['2026-03-25','expense','อาหาร',145,'TTB','ป๊อปคอร์น SF Salaya'],
+    ['2026-03-25','expense','กาแฟ/น้ำหวาน',35,'KTC','น้ำปั่น Grab'],
+    ['2026-03-26','income','เบี้ยเลี้ยง',15485,'Make','Turkey'],
+    ['2026-03-26','expense','อาหาร',50,'QR Code','ข้าว โรงเย็น'],
+    ['2026-03-26','expense','อาหาร',38,'QR Code','ขนมปัง top'],
+    ['2026-03-27','income','เงินเดือน',28960,'Make','เงินเดือน มีนา'],
+    ['2026-03-27','expense','อาหาร',40,'QR Code','ขนมกลางคืน ตั้งสิน'],
+    ['2026-03-27','expense','Lifestyle',1700,'KTC','Vivo มีนา'],
+    ['2026-03-27','expense','Lifestyle',1706,'KTC','Instra X5 มีนา'],
+    ['2026-03-27','expense','BRV',1083,'KTC','3M Absolute'],
+    ['2026-03-27','expense','Lifestyle',3080,'KBank','Samsung S26 Ultra'],
+    ['2026-03-27','expense','Lifestyle',85,'QR Code','Netflix'],
+    ['2026-03-27','expense','Fix cost',3000,'QR Code','ค่าบ้าน'],
+    ['2026-03-27','expense','อาหาร',55,'TTB','ข้าว Grab'],
+    ['2026-03-29','expense','สุขภาพ',250,'TTB','ตัดผม ท่าม่วง'],
+    ['2026-03-29','expense','BRV',1300,'TTB','น้ำมัน ก่อนขึ้น M81'],
+    ['2026-03-29','expense','อาหาร',80,'TTB','ขนมจีน Lineman'],
+    ['2026-03-29','expense','เดินทาง',85,'Make','M81'],
+    ['2026-03-29','expense','อาหาร',238,'QR Code','Makco'],
+    ['2026-03-29','expense','อาหาร',8,'QR Code','ไอติม แมคโคร'],
+    ['2026-03-30','expense','สุขภาพ',47,'Make','ไหมขัดฟัน westgate'],
+    ['2026-03-30','expense','ประกัน',13076,'KTC','ประกัน AIA'],
+    ['2026-03-30','expense','กาแฟ/น้ำหวาน',70,'TTB','Starbucks westgate'],
+    ['2026-03-30','expense','อาหาร',469,'QR Code','หมูกระทะ ทวีโชค'],
+    ['2026-03-31','expense','อาหาร',50,'QR Code','ข้าวแกง โรงเย็น'],
+    ['2026-03-31','expense','กาแฟ/น้ำหวาน',112,'QR Code','PT ก่อนเข้าแคมป์'],
+    ['2026-03-31','expense','สุขภาพ',1016,'Krungsri NOW','eveandboy'],
+    ['2026-04-01','expense','กาแฟ/น้ำหวาน',166,'KBank','7 เก็บตัว'],
+    ['2026-04-02','expense','สุขภาพ',88,'KBank','7 แบตแปรง'],
+    ['2026-04-08','expense','อาหาร',70,'QR Code','ข้าวกระเพรา ปากมัน'],
+    ['2026-04-09','expense','อาหาร',90,'QR Code','เซ็งซิมอี้'],
+    ['2026-04-09','expense','ของใช้',94,'QR Code','โลตัส'],
+    ['2026-04-09','expense','Fix cost',757,'Make','ค่าไฟ'],
+    ['2026-04-09','expense','Fix cost',297,'Make','ค่าน้ำ'],
+    ['2026-04-10','income','โบนัส',30000,'เงินสด','โบนัส'],
+    ['2026-04-12','expense','งาน',40,'KBank','ปริ้นเอกสาร'],
+    ['2026-04-12','expense','อาหาร',80,'TTB','ข้าว Grab'],
+    ['2026-04-13','expense','BRV',1050,'TTB','น้ำมัน 448km'],
+    ['2026-04-14','expense','กาแฟ/น้ำหวาน',39,'KBank','น้ำมะพร้าว โรงแรม'],
+    ['2026-04-15','expense','งาน',30,'QR Code','ถ่ายเอกสาร'],
+    ['2026-04-15','expense','กาแฟ/น้ำหวาน',85,'QR Code','กาแฟ คนจร อายโน้ต'],
+    ['2026-04-16','expense','อาหาร',257,'QR Code','ตำหน้าหมู่บ้าน'],
+    ['2026-04-16','expense','อาหาร',315,'QR Code','Little wood'],
+    ['2026-04-16','expense','กาแฟ/น้ำหวาน',62,'KBank','7'],
+    ['2026-04-17','expense','BRV',3500,'Make','เซ็นเซอร์ O2 Fast store สาย3'],
+    ['2026-04-17','expense','อาหาร',50,'QR Code','ข้าวกระเพรา'],
+    ['2026-04-17','expense','อาหาร',50,'QR Code','ข้าวกระเพรา ตรงข้ามเที่ยงคืน'],
+    ['2026-04-18','expense','อาหาร',60,'QR Code','โจ๊กสยาม'],
+    ['2026-04-18','expense','อาหาร',60,'QR Code','ข้าวผัด ตลาดเวิล์ด'],
+    ['2026-04-18','expense','ของขวัญ',60,'QR Code','ดอกไม้ ตลาดเวิล์ด'],
+    ['2026-04-18','expense','อาหาร',120,'QR Code','แตงโม'],
+    ['2026-04-18','expense','อาหาร',42,'TTB','ข้าวต้ม Grab'],
+    ['2026-04-19','expense','อาหาร',50,'QR Code','ปอกๆ'],
+    ['2026-04-19','expense','อาหาร',205,'KBank','7'],
+    ['2026-04-19','expense','อาหาร',55,'QR Code','ข้าวผัด'],
+    ['2026-04-19','expense','ของใช้',170,'QR Code','คีมคอมา'],
+    ['2026-04-20','expense','อาหาร',29,'KBank','แซนวิส'],
+    ['2026-04-21','expense','อาหาร',110,'QR Code','กระเพราและหมาลาตั้งสิน'],
+    ['2026-04-21','expense','อาหาร',89,'QR Code','ก๋วยเตี๋ยวไก่ บุฟเฟ่'],
+    ['2026-04-21','expense','อาหาร',110,'QR Code','ส้มตำหน้าม้อ'],
+    ['2026-04-22','expense','อาหาร',45,'QR Code','ข้าวมันไก่ Lotus'],
+    ['2026-04-23','expense','อาหาร',50,'QR Code','ลูกชิ้นกับผัดไทย'],
+    ['2026-04-23','expense','เกมส์',2238,'Krungsri NOW','Flydigi Bs2pro'],
+    ['2026-04-23','expense','อาหาร',244,'QR Code','หมูกระทะทวีโชค'],
+    ['2026-04-24','expense','อาหาร',96,'QR Code','ตำแซบทีมชาติ'],
+    ['2026-04-24','expense','อาหาร',153.5,'QR Code','Eat am are'],
+    ['2026-04-24','expense','อาหาร',186,'QR Code','ซูชิไข่หวาน ศาลายา'],
+    ['2026-04-25','expense','อาหาร',100,'QR Code','กระเพราหมูกรอบ ธนการณ์'],
+    ['2026-04-25','expense','BRV',11400,'KTC','ประกันรถยนต์ Honda Kan'],
+    ['2026-04-25','expense','กาแฟ/น้ำหวาน',75,'QR Code','Ada น้ำ'],
+    ['2026-04-25','expense','ของใช้',137,'KBank','7'],
+    ['2026-04-25','expense','BRV',1130,'TTB','Caltex 370km'],
+    ['2026-04-26','expense','สุขภาพ',149,'QR Code','ยา'],
+    ['2026-04-26','expense','เดินทาง',185,'KTC','Grab'],
+    ['2026-04-26','expense','อาหาร',85,'QR Code','หมากฝรั่ง'],
+    ['2026-04-27','income','เงินเดือน',28793,'เงินสด','เงินเดือน'],
+    ['2026-04-28','expense','Fix cost',3000,'QR Code','ค่าบ้าน'],
+    ['2026-04-28','expense','Lifestyle',3080,'KBank','Samsung S26 Ultra'],
+    ['2026-04-28','expense','เดินทาง',265,'Easy Pass','M Flow'],
+    ['2026-04-28','expense','Lifestyle',1706,'KTC','Instra X5'],
+    ['2026-04-28','expense','Lifestyle',1700,'KTC','Vivo'],
+    ['2026-04-28','expense','BRV',1167,'KTC','3M Absolute'],
+    ['2026-04-29','expense','อาหาร',99,'QR Code','KFC แจกให้วิทยากร'],
+    ['2026-04-29','expense','อาหาร',40,'KBank','7'],
+    ['2026-04-29','expense','กาแฟ/น้ำหวาน',150,'QR Code','Cafe ช้าง เชียงใหม่'],
+    ['2026-05-02','expense','กาแฟ/น้ำหวาน',160,'QR Code','น้ำสนามบิน'],
+    ['2026-05-02','expense','เดินทาง',412,'TTB','Grab'],
+    ['2026-05-02','income','โอนเงินเข้า',170,'เงินสด','พี่อีฟโอนคืน'],
+    ['2026-05-02','expense','อาหาร',294,'QR Code','ข้าวเย็น'],
+    ['2026-05-02','expense','เกมส์',390,'QR Code','แผ่นรองเมาส์'],
+    ['2026-05-02','expense','อาหาร',109,'QR Code','ข้าว ตลาดดอกไม้'],
+    ['2026-05-03','expense','เกมส์',390,'QR Code','เมาส์'],
+    ['2026-05-03','expense','อาหาร',146,'QR Code','ข้าวเย็นกับแฟน Mr.gill'],
+    ['2026-05-03','expense','Lifestyle',1150,'Make','Set up กีตาร์'],
+    ['2026-05-03','expense','อาหาร',160,'QR Code','ข้าวกลางวัน นครปฐม'],
+    ['2026-05-04','expense','อาหาร',710,'QR Code','อาหารทะเล วันเกิดแพะ'],
+    ['2026-05-04','expense','กาแฟ/น้ำหวาน',367,'KBank','7'],
+    ['2026-05-04','expense','สุขภาพ',300,'Make','นวด'],
+    ['2026-05-04','expense','BRV',1540,'TTB','น้ำมัน 585.6km'],
+    ['2026-05-04','expense','อาหาร',262,'QR Code','ครัวมะยม'],
+    ['2026-05-04','expense','กาแฟ/น้ำหวาน',220,'QR Code','Byon Cafe'],
+    ['2026-05-04','expense','ของขวัญ',240,'QR Code','เค้ก'],
+    ['2026-05-04','expense','ของขวัญ',933,'TTB','นายอินทร์'],
+    ['2026-05-04','expense','อาหาร',100,'QR Code','ข้าวเย็น'],
+    ['2026-05-05','expense','อาหาร',276,'TTB','MC'],
+    ['2026-05-05','expense','กาแฟ/น้ำหวาน',95,'QR Code','Punthai'],
+    ['2026-05-06','expense','ของใช้',50,'QR Code','แปรงสีฟัน'],
+    ['2026-05-06','expense','อาหาร',529,'Make','ทุเรียน'],
+    ['2026-05-06','expense','ของขวัญ',50,'QR Code','ดอกทิลลิป'],
+    ['2026-05-07','expense','กาแฟ/น้ำหวาน',110,'QR Code','Kamu'],
+    ['2026-05-07','income','เบี้ยเลี้ยง',11400,'เงินสด','เบี้ยเลี้ยง เมษา'],
+    ['2026-05-07','expense','อาหาร',60,'QR Code','ข้าวมันไก่ Westgate'],
+    ['2026-05-08','expense','อาหาร',72,'TTB','ข้าวหมูกรอบ LM'],
+    ['2026-05-08','expense','อาหาร',45,'QR Code','ปอกๆ'],
+    ['2026-05-08','expense','อาหาร',98,'TTB','กระเพรา LM'],
+    ['2026-05-09','expense','อาหาร',275,'QR Code','ตี๋น้อย'],
+    ['2026-05-09','expense','ของใช้',89,'TTB','น้ำยาซักผ้า'],
+    ['2026-05-09','expense','อาหาร',272,'QR Code','ค่าผลไม้'],
+    ['2026-05-09','expense','อาหาร',300,'QR Code','ส้มตำ หน้าม้อ'],
+    ['2026-05-10','expense','งาน',700,'Krungsri NOW','Claude'],
+    ['2026-05-10','expense','อาหาร',89,'QR Code','กระเพราหมูกรอบ'],
+    ['2026-05-10','expense','Lifestyle',85,'QR Code','Netflix'],
+    ['2026-05-10','expense','กาแฟ/น้ำหวาน',99,'QR Code','ไอติมสเวนเซน'],
+    ['2026-05-10','expense','กาแฟ/น้ำหวาน',69,'QR Code','Kamu'],
+    ['2026-05-11','expense','อาหาร',179,'QR Code','ข้าวกลางวัน Seacon'],
+    ['2026-05-12','expense','อาหาร',50,'QR Code','ปอกๆ'],
+    ['2026-05-12','expense','อาหาร',98,'TTB','ไลน์แมน'],
+    ['2026-05-13','expense','อาหาร',60,'QR Code','เจ้นอย'],
+    ['2026-05-13','expense','Fix cost',1045,'KBank','ค่าไฟฟ้า'],
+    ['2026-05-14','expense','อาหาร',160,'QR Code','ก๋วยเตี๋ยว+ข้าว westgate'],
+    ['2026-05-14','expense','อาหาร',140,'QR Code','ส้มตำ'],
+    ['2026-05-14','expense','กาแฟ/น้ำหวาน',48,'QR Code','ขนม'],
+    ['2026-05-14','expense','อาหาร',65,'QR Code','ก๋วยเตี๋ยว'],
+    ['2026-05-15','expense','เดินทาง',130,'เงินสด','M81'],
+  ];
+  const INST=[
+    {name:'Vivo',totalMonths:10,paidMonths:8,amountPerMonth:1700,account:'KTC',note:''},
+    {name:'Instra X5',totalMonths:10,paidMonths:5,amountPerMonth:1706,account:'KTC',note:''},
+    {name:'3M Absolute',totalMonths:6,paidMonths:5,amountPerMonth:1083,account:'KTC',note:''},
+    {name:'Samsung S26 Ultra',totalMonths:10,paidMonths:2,amountPerMonth:3080,account:'KBank',note:''},
+  ];
+  const BUDGETS={'อาหาร':5000,'กาแฟ/น้ำหวาน':1000,'เดินทาง':1000,'BRV':3500,'Fix cost':10000,'Lifestyle':5000,'สุขภาพ':1500};
+  const CATS={income:[{name:'เงินเดือน',emoji:'💰'},{name:'เบี้ยเลี้ยง',emoji:'🎖️'},{name:'โบนัส',emoji:'🎉'},{name:'ธุรกิจ',emoji:'🏪'},{name:'ลงทุน',emoji:'📈'},{name:'โอนเงินเข้า',emoji:'💸'},{name:'อื่นๆ',emoji:'✨'}],expense:[{name:'อาหาร',emoji:'🍜'},{name:'กาแฟ/น้ำหวาน',emoji:'☕'},{name:'เดินทาง',emoji:'🚗'},{name:'BRV',emoji:'⛽'},{name:'Fix cost',emoji:'🏠'},{name:'Lifestyle',emoji:'🎮'},{name:'สุขภาพ',emoji:'🏥'},{name:'ของขวัญ',emoji:'🎁'},{name:'งาน',emoji:'🔧'},{name:'ของใช้',emoji:'🛒'},{name:'ประกัน',emoji:'🛡️'},{name:'เกมส์',emoji:'🕹️'},{name:'อื่นๆ',emoji:'📦'}]};
+  localStorage.setItem('financeApp_v1', JSON.stringify({
+    transactions: RAW.map((r,i)=>({id:gid(i),date:r[0],type:r[1],category:r[2],amount:r[3],account:r[4],note:r[5],createdAt:new Date(r[0]).getTime()+i})),
+    categories: CATS,
+    budgets: BUDGETS,
+    installments: INST.map((x,i)=>({id:gid(1000+i),...x})),
+    accounts: DEFAULT_ACCS,
+    fixcostItems: [],
+    fixcostChecks: {},
+    cycleDay: 25,
+  }));
+})();
+</script>
+<!-- ===== MODAL: Add Category ===== -->
+<div id="modal-cat" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-cat-title" style="font-size:16px;margin-bottom:14px">เพิ่มหมวดหมู่</h3>
+    <div class="form-group">
+      <label class="form-label">Emoji</label>
+      <input type="text" id="modal-cat-emoji" class="form-input" placeholder="🍕" maxlength="2" style="font-size:24px;text-align:center">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ชื่อหมวดหมู่</label>
+      <input type="text" id="modal-cat-name" class="form-input" placeholder="เช่น ท่องเที่ยว">
+    </div>
+    <button onclick="saveCategory()" class="btn-primary">บันทึก</button>
+    <button onclick="closeModal('modal-cat')" class="btn-danger" style="margin-top:8px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Add Account ===== -->
+<div id="modal-account" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 style="font-size:16px;margin-bottom:14px">เพิ่มวิธีชำระเงิน</h3>
+    <div class="form-group">
+      <label class="form-label">ชื่อบัญชี / บัตร</label>
+      <input type="text" id="modal-account-input" class="form-input" placeholder="เช่น Rabbit LINE Pay">
+    </div>
+    <button onclick="saveAccount()" class="btn-primary">บันทึก</button>
+    <button onclick="closeModal('modal-account')" class="btn-danger" style="margin-top:8px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Fix cost item ===== -->
+<div id="modal-fixcost" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-fixcost-title" style="font-size:16px;margin-bottom:14px">เพิ่มรายการประจำ</h3>
+    <div class="form-group">
+      <label class="form-label">ชื่อรายการ</label>
+      <input type="text" id="modal-fixcost-name" class="form-input" placeholder="เช่น ค่าบ้าน, AIS">
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวนเงิน (บาท) — ไม่บังคับ</label>
+      <input type="text" inputmode="decimal" id="modal-fixcost-amount" class="form-input" placeholder="ไม่ระบุ">
+    </div>
+    <button onclick="saveFixcostItem()" class="btn-primary">บันทึก</button>
+    <button id="delete-fixcost-btn" onclick="deleteFixcostItem()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
+    <button onclick="closeModal('modal-fixcost')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Quick Add Recurring Template ===== -->
+<div id="modal-recurring" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 style="font-size:16px;margin-bottom:14px">⚡ เพิ่ม Quick Add Template</h3>
+    <div class="form-group">
+      <label class="form-label">ชื่อ Template</label>
+      <input type="text" id="modal-recurring-name" class="form-input" placeholder="เช่น ค่าบ้าน, AIS, ข้าวเช้า">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ประเภท</label>
+      <select id="modal-recurring-type" class="form-input" onchange="onRecurringTypeChange(this.value)">
+        <option value="expense">รายจ่าย 💸</option>
+        <option value="income">รายรับ 💰</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวนเงิน (ไม่บังคับ)</label>
+      <input type="text" inputmode="decimal" id="modal-recurring-amount" class="form-input" placeholder="ถ้าไม่ระบุ ต้องพิมพ์เองทุกครั้ง">
+    </div>
+    <div class="form-group">
+      <label class="form-label">หมวดหมู่</label>
+      <select id="modal-recurring-cat" class="form-input"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">บัญชี / บัตร</label>
+      <select id="modal-recurring-account" class="form-input"></select>
+    </div>
+    <button onclick="saveRecurring()" class="btn-primary">บันทึก</button>
+    <button onclick="closeModal('modal-recurring')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
