@@ -193,11 +193,10 @@
         <button id="chart-next">&#8250;</button>
       </div>
 
-      <!-- Tab bar (4 tabs) -->
-      <div class="tab-bar tab-bar-4">
+      <!-- Tab bar (3 tabs) -->
+      <div class="tab-bar">
         <button class="tab-btn active" data-tab="charts" onclick="switchReportsTab('charts')">📊 กราฟ</button>
         <button class="tab-btn" data-tab="budget" onclick="switchReportsTab('budget')">🎯 งบ</button>
-        <button class="tab-btn" data-tab="install" onclick="switchReportsTab('install')">💳 ผ่อน</button>
         <button class="tab-btn" data-tab="fuel" onclick="switchReportsTab('fuel')">⛽ น้ำมัน</button>
       </div>
 
@@ -236,12 +235,6 @@
           <div class="section-title">งบประมาณต่อหมวดหมู่ — กดเพื่อตั้งงบ</div>
           <div id="budget-container"></div>
         </div>
-      </div>
-
-      <!-- Tab: Installments -->
-      <div id="tab-install" class="tab-content" style="display:none">
-        <div id="install-container"></div>
-        <button onclick="openInstallAdd()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการผ่อน</button>
       </div>
 
       <!-- Tab: Fuel -->
@@ -291,10 +284,11 @@
       <!-- Allocation: bonus splits -->
       <div class="card" id="salary-bonus-card" style="display:none"></div>
 
-      <!-- Sub-tabs: ประจำ | เป้าหมาย -->
-      <div class="tab-bar tab-bar-2">
+      <!-- Sub-tabs: ประจำ | เป้าหมาย | ผ่อน -->
+      <div class="tab-bar">
         <button class="tab-btn active" data-stab="fixcost" onclick="switchSalaryTab('fixcost')">✅ ประจำ</button>
         <button class="tab-btn" data-stab="goals" onclick="switchSalaryTab('goals')">🏦 เป้าหมาย</button>
+        <button class="tab-btn" data-stab="install" onclick="switchSalaryTab('install')">💳 ผ่อน</button>
       </div>
 
       <!-- Sub-tab: Fix cost -->
@@ -311,6 +305,12 @@
       <div id="stab-goals" class="tab-content" style="display:none">
         <div id="goals-container"></div>
         <button onclick="openGoalModal()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มเป้าหมาย</button>
+      </div>
+
+      <!-- Sub-tab: Installments -->
+      <div id="stab-install" class="tab-content" style="display:none">
+        <div id="install-container"></div>
+        <button onclick="openInstallAdd()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการผ่อน</button>
       </div>
     </div>
 

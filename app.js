@@ -835,13 +835,12 @@ function renderReports() {
 function switchReportsTab(tab) {
   state.reportsTab = tab;
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['charts','budget','install','fuel'].forEach(id => {
+  ['charts','budget','fuel'].forEach(id => {
     document.getElementById(`tab-${id}`).style.display = id === tab ? 'block' : 'none';
   });
-  if (tab === 'charts')  { requestAnimationFrame(() => { renderBarChart(); renderDailyChart(); renderPieChart(); }); }
-  if (tab === 'budget')  renderBudget();
-  if (tab === 'install') renderInstalls();
-  if (tab === 'fuel')    renderFuelTab();
+  if (tab === 'charts') { requestAnimationFrame(() => { renderBarChart(); renderDailyChart(); renderPieChart(); }); }
+  if (tab === 'budget') renderBudget();
+  if (tab === 'fuel')   renderFuelTab();
 }
 
 // ===== SALARY PLANNER =====
@@ -925,7 +924,18 @@ function _renderSalaryAllocation(entry) {
     const vat = item.vat || 0;
     const effectiveAmt = Math.round((item.amount || 0) * (1 + vat / 100));
     const vatLabel = vat > 0 ? ` <span style="font-size:11px;color:#9E9E9E">+VAT ${vat}%</span>` : '';
-    allocHtml += row('📌', item.name + vatLabel, effectiveAmt, true, item.id);
+    allocHtml += `<div draggable="true"
+      ondragstart="_salaryItemDragStart('${item.id}')"
+      ondragover="event.preventDefault()"
+      ondrop="event.preventDefault();_salaryItemDrop('${item.id}')"
+      onclick="openSalaryCustomItemModal('${item.id}')"
+      style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <span style="font-size:14px;display:flex;align-items:center;gap:6px">
+        <span style="color:#bbb;font-size:18px;cursor:grab;line-height:1" onclick="event.stopPropagation()">⠿</span>
+        📌 ${item.name}${vatLabel}
+      </span>
+      <span style="font-weight:700">฿${effectiveAmt.toLocaleString()}</span>
+    </div>`;
   });
 
   allocHtml += `<div style="text-align:right;padding:6px 0">
@@ -979,6 +989,26 @@ function _renderExtraIncomeCard(type, amount, splits) {
 }
 
 // -- Custom salary items --
+let _dragSalaryItemId = null;
+
+function _salaryItemDragStart(id) {
+  _dragSalaryItemId = id;
+}
+
+function _salaryItemDrop(targetId) {
+  if (!_dragSalaryItemId || _dragSalaryItemId === targetId) return;
+  const data = getData();
+  const items = data.salaryConfig.customItems;
+  const fromIdx = items.findIndex(i => i.id === _dragSalaryItemId);
+  const toIdx   = items.findIndex(i => i.id === targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = items.splice(fromIdx, 1);
+  items.splice(toIdx, 0, moved);
+  saveData(data);
+  _renderSalaryAllocation(_getCurrentSalaryEntry());
+  _dragSalaryItemId = null;
+}
+
 function openSalaryCustomItemModal(id) {
   state._editingSalaryItemId = id || null;
   if (id) {
@@ -1105,12 +1135,13 @@ function saveSalaryEntry() {
 function switchSalaryTab(tab) {
   state.salaryTab = tab;
   document.querySelectorAll('[data-stab]').forEach(b => b.classList.toggle('active', b.dataset.stab === tab));
-  ['fixcost', 'goals'].forEach(id => {
+  ['fixcost', 'goals', 'install'].forEach(id => {
     const el = document.getElementById(`stab-${id}`);
     if (el) el.style.display = id === tab ? 'block' : 'none';
   });
   if (tab === 'fixcost') { renderFixcostChecklist(); renderAnnualSection(); }
   if (tab === 'goals')   renderGoalsTab();
+  if (tab === 'install') renderInstalls();
 }
 
 // ---- Charts ----
