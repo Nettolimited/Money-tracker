@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.8';
+const APP_VERSION = '2.9';
 const CHANGELOG = [
+  { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
   { v: '2.8', date: '20 พ.ค. 68', note: '⛽ น้ำมัน: กรอกระยะต่อถัง, default 95, ปั้ม dropdown พร้อมเพิ่มเองได้' },
   { v: '2.7', date: '20 พ.ค. 68', note: 'Tab bar 2 แถว + ⛽ น้ำมันเชื่อมรายจ่าย BRV อัตโนมัติ' },
   { v: '2.6', date: '20 พ.ค. 68', note: 'เพิ่มแท็บ ⛽ น้ำมัน — บันทึกการเติม, คำนวณ กม./ลิตร และ บาท/กม. อัตโนมัติ' },
@@ -1568,6 +1569,13 @@ function deleteFixcostItem() {
 
 // ===== SAVINGS GOALS =====
 
+function _goalMonthsLeft(deadlineMonth, deadlineYear) {
+  if (!deadlineMonth || !deadlineYear) return null;
+  const now = new Date();
+  const months = (deadlineYear - now.getFullYear()) * 12 + (deadlineMonth - (now.getMonth() + 1));
+  return months > 0 ? months : 0;
+}
+
 function renderGoalsTab() {
   const goals = getData().savingsGoals || [];
   const container = document.getElementById('goals-container');
@@ -1581,22 +1589,33 @@ function renderGoalsTab() {
       </div>`;
     return;
   }
+  const MONTHS_TH_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   container.innerHTML = goals.map(g => {
-    const pct = g.targetAmount > 0 ? Math.min(100, Math.round((g.savedAmount / g.targetAmount) * 100)) : 0;
+    const pct  = g.targetAmount > 0 ? Math.min(100, Math.round((g.savedAmount / g.targetAmount) * 100)) : 0;
     const done = pct >= 100;
+    const remaining = Math.max(0, g.targetAmount - g.savedAmount);
+    const monthsLeft = _goalMonthsLeft(g.deadlineMonth, g.deadlineYear);
+    const perMonth = (monthsLeft > 0 && !done) ? Math.ceil(remaining / monthsLeft) : null;
+    const deadlineStr = g.deadlineMonth ? `${MONTHS_TH_SHORT[g.deadlineMonth]} ${g.deadlineYear ? (g.deadlineYear + 543).toString().slice(-2) : ''}` : '';
+    const urgentColor = monthsLeft !== null && monthsLeft <= 3 && !done ? '#FF1744' : 'var(--primary)';
     return `
     <div class="card goal-card" onclick="openGoalModal('${g.id}')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-size:15px;font-weight:700">${done ? '✅ ' : ''}${g.name}</div>
-        <div style="font-size:12px;font-weight:800;color:${done ? 'var(--income-color,#2ecc71)' : 'var(--primary)'}">${pct}%</div>
+        <div style="font-size:12px;font-weight:800;color:${done ? '#2ecc71' : urgentColor}">${pct}%</div>
       </div>
       <div class="goal-progress-bar">
-        <div class="goal-progress-fill" style="width:${pct}%;background:${done ? '#2ecc71' : 'var(--primary)'}"></div>
+        <div class="goal-progress-fill" style="width:${pct}%;background:${done ? '#2ecc71' : urgentColor}"></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:13px;color:#9E9E9E">
-        <span>เก็บได้ <b style="color:var(--text-color,#212121)">฿${Number(g.savedAmount).toLocaleString()}</b></span>
-        <span>เป้า <b style="color:var(--text-color,#212121)">฿${Number(g.targetAmount).toLocaleString()}</b></span>
+        <span>เก็บได้ <b style="color:#212121">฿${Number(g.savedAmount).toLocaleString()}</b></span>
+        <span>เป้า <b style="color:#212121">฿${Number(g.targetAmount).toLocaleString()}</b></span>
       </div>
+      ${(deadlineStr || perMonth) ? `
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;padding-top:6px;border-top:1px solid #F0F0F0">
+        ${deadlineStr ? `<span style="color:#9E9E9E">🗓 ภายใน ${deadlineStr}${monthsLeft !== null ? ` (${monthsLeft} เดือน)` : ''}</span>` : '<span></span>'}
+        ${perMonth ? `<span style="color:${urgentColor};font-weight:700">เดือนละ ฿${perMonth.toLocaleString()}</span>` : (done ? '<span style="color:#2ecc71;font-weight:700">สำเร็จแล้ว! 🎉</span>' : '')}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1605,6 +1624,11 @@ function openGoalModal(id) {
   state.editingGoalId = id || null;
   const titleEl = document.getElementById('modal-goal-title');
   const delBtn  = document.getElementById('delete-goal-btn');
+  // populate year dropdown (ปีนี้ถึง +5)
+  const yearSel = document.getElementById('goal-deadline-year');
+  const curYear = new Date().getFullYear();
+  yearSel.innerHTML = '<option value="">-- ปี --</option>' +
+    Array.from({length: 6}, (_, i) => curYear + i).map(y => `<option value="${y}">${y + 543}</option>`).join('');
   if (id) {
     const goal = (getData().savingsGoals || []).find(g => g.id === id);
     if (!goal) return;
@@ -1612,30 +1636,38 @@ function openGoalModal(id) {
     document.getElementById('goal-name').value   = goal.name;
     document.getElementById('goal-target').value = goal.targetAmount;
     document.getElementById('goal-saved').value  = goal.savedAmount;
+    document.getElementById('goal-deadline-month').value = goal.deadlineMonth || '';
+    yearSel.value = goal.deadlineYear || '';
     delBtn.style.display = 'block';
   } else {
     titleEl.textContent = 'เพิ่มเป้าหมายการเก็บเงิน';
     document.getElementById('goal-name').value   = '';
     document.getElementById('goal-target').value = '';
     document.getElementById('goal-saved').value  = '';
+    document.getElementById('goal-deadline-month').value = '';
+    yearSel.value = '';
     delBtn.style.display = 'none';
   }
   openModal('modal-goal');
 }
 
 function saveGoal() {
-  const name   = document.getElementById('goal-name').value.trim();
-  const target = parseFloat(document.getElementById('goal-target').value.replace(/,/g,''));
-  const saved  = parseFloat(document.getElementById('goal-saved').value.replace(/,/g,'')) || 0;
-  if (!name)         { alert('กรุณากรอกชื่อเป้าหมาย'); return; }
+  const name          = document.getElementById('goal-name').value.trim();
+  const target        = parseFloat(document.getElementById('goal-target').value.replace(/,/g,''));
+  const saved         = parseFloat(document.getElementById('goal-saved').value.replace(/,/g,'')) || 0;
+  const deadlineMonth = parseInt(document.getElementById('goal-deadline-month').value) || null;
+  const deadlineYear  = parseInt(document.getElementById('goal-deadline-year').value)  || null;
+  if (!name)              { alert('กรุณากรอกชื่อเป้าหมาย'); return; }
   if (!target || target <= 0) { alert('กรุณากรอกจำนวนเงินเป้าหมาย'); return; }
+  if ((deadlineMonth && !deadlineYear) || (!deadlineMonth && deadlineYear)) { alert('กรุณาเลือกทั้งเดือนและปี'); return; }
   const data = getData();
   if (!data.savingsGoals) data.savingsGoals = [];
+  const goalObj = { name, targetAmount: target, savedAmount: saved, deadlineMonth, deadlineYear };
   if (state.editingGoalId) {
     const idx = data.savingsGoals.findIndex(g => g.id === state.editingGoalId);
-    if (idx !== -1) data.savingsGoals[idx] = { ...data.savingsGoals[idx], name, targetAmount: target, savedAmount: saved };
+    if (idx !== -1) data.savingsGoals[idx] = { ...data.savingsGoals[idx], ...goalObj };
   } else {
-    data.savingsGoals.push({ id: genId(), name, targetAmount: target, savedAmount: saved });
+    data.savingsGoals.push({ id: genId(), ...goalObj });
   }
   saveData(data);
   state.editingGoalId = null;

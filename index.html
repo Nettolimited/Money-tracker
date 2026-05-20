@@ -789,6 +789,27 @@
       <label class="form-label">ยอดที่เก็บได้แล้ว (บาท)</label>
       <input type="text" inputmode="decimal" id="goal-saved" class="form-input" placeholder="0">
     </div>
+    <div class="form-group">
+      <label class="form-label">ต้องการเก็บให้ได้ภายใน (ไม่บังคับ)</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <select id="goal-deadline-month" class="form-input">
+          <option value="">-- เดือน --</option>
+          <option value="1">มกราคม</option>
+          <option value="2">กุมภาพันธ์</option>
+          <option value="3">มีนาคม</option>
+          <option value="4">เมษายน</option>
+          <option value="5">พฤษภาคม</option>
+          <option value="6">มิถุนายน</option>
+          <option value="7">กรกฎาคม</option>
+          <option value="8">สิงหาคม</option>
+          <option value="9">กันยายน</option>
+          <option value="10">ตุลาคม</option>
+          <option value="11">พฤศจิกายน</option>
+          <option value="12">ธันวาคม</option>
+        </select>
+        <select id="goal-deadline-year" class="form-input"></select>
+      </div>
+    </div>
     <button onclick="saveGoal()" class="btn-primary">บันทึก</button>
     <button id="delete-goal-btn" onclick="deleteGoal()" class="btn-danger" style="display:none;margin-top:8px">ลบเป้าหมายนี้</button>
     <button onclick="closeModal('modal-goal')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
