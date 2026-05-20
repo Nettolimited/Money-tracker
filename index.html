@@ -248,8 +248,13 @@
 
       <!-- Tab: Fix cost checklist -->
       <div id="tab-fixcost" class="tab-content" style="display:none">
+        <div class="section-title" style="margin-bottom:8px">💸 จ่ายทุกเดือน</div>
         <div id="fixcost-container"></div>
-        <button onclick="openAddFixcostItem()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการประจำ</button>
+        <button onclick="openAddFixcostItem()" class="btn-secondary" style="margin-bottom:16px">+ เพิ่มรายการรายเดือน</button>
+
+        <div class="section-title" style="margin-bottom:8px">📅 เก็บสำหรับรายปี</div>
+        <div id="annual-container"></div>
+        <button onclick="openAnnualModal()" class="btn-secondary" style="margin-bottom:12px">+ เพิ่มรายการรายปี</button>
       </div>
 
       <!-- Tab: Savings Goals -->
@@ -691,6 +696,40 @@
     </div>
     <button onclick="saveAccount()" class="btn-primary">บันทึก</button>
     <button onclick="closeModal('modal-account')" class="btn-danger" style="margin-top:8px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Annual Cost Add/Edit ===== -->
+<div id="modal-annual" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-annual-title" style="font-size:16px;margin-bottom:14px">📅 เพิ่มรายการรายปี</h3>
+    <div class="form-group">
+      <label class="form-label">ชื่อรายการ</label>
+      <input type="text" id="annual-name" class="form-input" placeholder="เช่น ประกัน AIA, ทะเบียนรถ">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ยอดรายปี (บาท)</label>
+      <input type="text" inputmode="decimal" id="annual-amount" class="form-input" placeholder="14000">
+    </div>
+    <div class="form-group">
+      <label class="form-label">เดือนที่ต้องจ่าย</label>
+      <select id="annual-pay-month" class="form-input">
+        <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
+        <option value="3">มีนาคม</option><option value="4">เมษายน</option>
+        <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+        <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
+        <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
+        <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">บัญชี / บัตรที่จ่าย</label>
+      <select id="annual-account" class="form-input"></select>
+    </div>
+    <button onclick="saveAnnualItem()" class="btn-primary">บันทึก</button>
+    <button id="delete-annual-btn" onclick="deleteAnnualItem()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
+    <button onclick="closeModal('modal-annual')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
   </div>
 </div>
 

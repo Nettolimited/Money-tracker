@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.9';
+const APP_VERSION = '3.0';
 const CHANGELOG = [
+  { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
   { v: '2.8', date: '20 พ.ค. 68', note: '⛽ น้ำมัน: กรอกระยะต่อถัง, default 95, ปั้ม dropdown พร้อมเพิ่มเองได้' },
   { v: '2.7', date: '20 พ.ค. 68', note: 'Tab bar 2 แถว + ⛽ น้ำมันเชื่อมรายจ่าย BRV อัตโนมัติ' },
@@ -409,6 +410,7 @@ const state = {
   addInstallId: null,
   editingGoalId: null,
   editingFuelId: null,
+  _editingAnnualId: null,
 };
 
 // ===== FORMAT HELPERS =====
@@ -809,7 +811,7 @@ function switchReportsTab(tab) {
   if (tab === 'charts')  { requestAnimationFrame(() => { renderBarChart(); renderDailyChart(); renderPieChart(); }); }
   if (tab === 'budget')  renderBudget();
   if (tab === 'install') renderInstalls();
-  if (tab === 'fixcost') renderFixcostChecklist();
+  if (tab === 'fixcost') { renderFixcostChecklist(); renderAnnualSection(); }
   if (tab === 'goals')   renderGoalsTab();
   if (tab === 'fuel')    renderFuelTab();
 }
@@ -1509,6 +1511,8 @@ function renderFixcostChecklist() {
     </div>`;
 }
 
+function _afterFixcostRender() { renderAnnualSection(); }
+
 function toggleFixcostCheck(id) {
   const data = getData();
   const monthKey = `${state.chartYear}-${String(state.chartMonth + 1).padStart(2,'0')}`;
@@ -1565,6 +1569,155 @@ function deleteFixcostItem() {
   state._editingFixcostId = null;
   closeModal('modal-fixcost');
   renderFixcostChecklist();
+}
+
+// ===== ANNUAL COSTS =====
+
+const MONTHS_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function renderAnnualSection() {
+  const items    = getData().annualCosts || [];
+  const container = document.getElementById('annual-container');
+  if (!items.length) {
+    container.innerHTML = `<div style="text-align:center;padding:16px;color:#9E9E9E;font-size:13px">ยังไม่มีรายการรายปี</div>`;
+    return;
+  }
+  const now      = new Date();
+  const nowYear  = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
+
+  container.innerHTML = items.map(item => {
+    const monthly  = Math.ceil(item.yearlyAmount / 12);
+    const checks   = item.monthlyChecks || {};
+    // นับเดือนที่ติ๊กแล้วในรอบปีนี้ (หลังจากจ่ายครั้งล่าสุด)
+    const lastPaidYear = item.lastPaidYear || (nowYear - 1);
+    let startYear = lastPaidYear, startMonth = item.payMonth + 1;
+    if (startMonth > 12) { startMonth = 1; startYear++; }
+    let checkedCount = 0, totalMonths = 0;
+    let y = startYear, m = startMonth;
+    while (y < nowYear || (y === nowYear && m <= nowMonth)) {
+      totalMonths++;
+      const key = `${y}-${String(m).padStart(2,'0')}`;
+      if (checks[key]) checkedCount++;
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    const pct = totalMonths > 0 ? Math.round(checkedCount / 12 * 100) : 0;
+    const isDueMonth = nowMonth === item.payMonth;
+    const isDue      = isDueMonth && (item.lastPaidYear || 0) < nowYear;
+    const curKey     = `${nowYear}-${String(nowMonth).padStart(2,'0')}`;
+    const checkedNow = !!checks[curKey];
+
+    return `
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-size:15px;font-weight:700">${item.name}</div>
+          <div style="font-size:12px;color:#9E9E9E">฿${item.yearlyAmount.toLocaleString()}/ปี · จ่าย${MONTHS_SHORT[item.payMonth]} · เดือนละ ฿${monthly.toLocaleString()}</div>
+        </div>
+        <button class="setting-del" onclick="openAnnualModal('${item.id}')">✏️</button>
+      </div>
+      ${isDue ? `
+        <div style="background:#FFF3E0;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;font-weight:700;color:#E65100">⚠️ ถึงเวลาจ่ายแล้ว!</span>
+          <button onclick="payAnnualCost('${item.id}')" style="background:#FF6F00;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">จ่ายแล้ว ✓</button>
+        </div>` : `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;color:#9E9E9E">เก็บแล้ว ${checkedCount}/12 เดือน</span>
+          <span style="font-size:12px;font-weight:700;color:var(--primary)">${pct}%</span>
+        </div>
+        <div class="goal-progress-bar" style="margin-bottom:8px">
+          <div class="goal-progress-fill" style="width:${pct}%;background:var(--primary)"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleAnnualCheck('${item.id}')">
+          <div class="fixcost-check ${checkedNow ? 'done' : 'undone'}" style="width:24px;height:24px;flex-shrink:0">${checkedNow ? '✅' : ''}</div>
+          <span style="font-size:13px;color:#212121">${checkedNow ? 'เดือนนี้เก็บแล้ว' : 'เดือนนี้ยังไม่ได้เก็บ'} (฿${monthly.toLocaleString()})</span>
+        </div>`}
+    </div>`;
+  }).join('');
+}
+
+function toggleAnnualCheck(id) {
+  const data = getData();
+  if (!data.annualCosts) return;
+  const item = data.annualCosts.find(i => i.id === id);
+  if (!item) return;
+  if (!item.monthlyChecks) item.monthlyChecks = {};
+  const now = new Date();
+  const key = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  item.monthlyChecks[key] = !item.monthlyChecks[key];
+  saveData(data);
+  renderAnnualSection();
+}
+
+function payAnnualCost(id) {
+  if (!confirm('ยืนยันว่าจ่ายแล้ว? ระบบจะสร้างรายจ่ายให้อัตโนมัติ')) return;
+  const data = getData();
+  const item = (data.annualCosts || []).find(i => i.id === id);
+  if (!item) return;
+  const now  = new Date();
+  const date = now.toISOString().slice(0, 10);
+  data.transactions.push({ id: genId(), type: 'expense', category: 'Fix cost', amount: item.yearlyAmount, account: item.account || '', date, note: `${item.name} (รายปี)`, createdAt: Date.now() });
+  item.lastPaidYear  = now.getFullYear();
+  item.monthlyChecks = {};
+  saveData(data);
+  renderAnnualSection();
+  showToast(`บันทึกรายจ่าย ${item.name} ฿${item.yearlyAmount.toLocaleString()} แล้ว ✅`);
+}
+
+function openAnnualModal(id) {
+  state._editingAnnualId = id || null;
+  const { accounts } = getData();
+  document.getElementById('annual-account').innerHTML = (accounts || []).map(a => `<option value="${a}">${a}</option>`).join('');
+  const delBtn = document.getElementById('delete-annual-btn');
+  if (id) {
+    const item = (getData().annualCosts || []).find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('modal-annual-title').textContent = '📅 แก้ไขรายการรายปี';
+    document.getElementById('annual-name').value      = item.name;
+    document.getElementById('annual-amount').value    = item.yearlyAmount;
+    document.getElementById('annual-pay-month').value = item.payMonth;
+    document.getElementById('annual-account').value   = item.account || '';
+    delBtn.style.display = 'block';
+  } else {
+    document.getElementById('modal-annual-title').textContent = '📅 เพิ่มรายการรายปี';
+    document.getElementById('annual-name').value      = '';
+    document.getElementById('annual-amount').value    = '';
+    document.getElementById('annual-pay-month').value = new Date().getMonth() + 1;
+    delBtn.style.display = 'none';
+  }
+  openModal('modal-annual');
+}
+
+function saveAnnualItem() {
+  const name     = document.getElementById('annual-name').value.trim();
+  const amount   = parseFloat(document.getElementById('annual-amount').value.replace(/,/g,''));
+  const payMonth = parseInt(document.getElementById('annual-pay-month').value);
+  const account  = document.getElementById('annual-account').value;
+  if (!name)               { alert('กรุณากรอกชื่อรายการ'); return; }
+  if (!amount || amount<=0){ alert('กรุณากรอกยอดรายปี'); return; }
+  const data = getData();
+  if (!data.annualCosts) data.annualCosts = [];
+  if (state._editingAnnualId) {
+    const idx = data.annualCosts.findIndex(i => i.id === state._editingAnnualId);
+    if (idx !== -1) data.annualCosts[idx] = { ...data.annualCosts[idx], name, yearlyAmount: amount, payMonth, account };
+  } else {
+    data.annualCosts.push({ id: genId(), name, yearlyAmount: amount, payMonth, account, monthlyChecks: {}, lastPaidYear: null });
+  }
+  saveData(data);
+  state._editingAnnualId = null;
+  closeModal('modal-annual');
+  renderAnnualSection();
+}
+
+function deleteAnnualItem() {
+  if (!state._editingAnnualId) return;
+  if (!confirm('ลบรายการนี้?')) return;
+  const data = getData();
+  data.annualCosts = (data.annualCosts || []).filter(i => i.id !== state._editingAnnualId);
+  saveData(data);
+  state._editingAnnualId = null;
+  closeModal('modal-annual');
+  renderAnnualSection();
 }
 
 // ===== SAVINGS GOALS =====
