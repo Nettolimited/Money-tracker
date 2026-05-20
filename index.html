@@ -713,6 +713,10 @@
       <input type="text" inputmode="decimal" id="annual-amount" class="form-input" placeholder="14000">
     </div>
     <div class="form-group">
+      <label class="form-label">ยอดที่เก็บได้แล้ว (บาท)</label>
+      <input type="text" inputmode="decimal" id="annual-saved" class="form-input" placeholder="0">
+    </div>
+    <div class="form-group">
       <label class="form-label">เดือนที่ต้องจ่าย</label>
       <select id="annual-pay-month" class="form-input">
         <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
@@ -722,10 +726,6 @@
         <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
         <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
       </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">บัญชี / บัตรที่จ่าย</label>
-      <select id="annual-account" class="form-input"></select>
     </div>
     <button onclick="saveAnnualItem()" class="btn-primary">บันทึก</button>
     <button id="delete-annual-btn" onclick="deleteAnnualItem()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>

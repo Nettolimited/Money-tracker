@@ -1587,47 +1587,40 @@ function renderAnnualSection() {
   const nowMonth = now.getMonth() + 1;
 
   container.innerHTML = items.map(item => {
-    const monthly  = Math.ceil(item.yearlyAmount / 12);
-    const checks   = item.monthlyChecks || {};
-    // นับเดือนที่ติ๊กแล้วในรอบปีนี้ (หลังจากจ่ายครั้งล่าสุด)
-    const lastPaidYear = item.lastPaidYear || (nowYear - 1);
-    let startYear = lastPaidYear, startMonth = item.payMonth + 1;
-    if (startMonth > 12) { startMonth = 1; startYear++; }
-    let checkedCount = 0, totalMonths = 0;
-    let y = startYear, m = startMonth;
-    while (y < nowYear || (y === nowYear && m <= nowMonth)) {
-      totalMonths++;
-      const key = `${y}-${String(m).padStart(2,'0')}`;
-      if (checks[key]) checkedCount++;
-      m++; if (m > 12) { m = 1; y++; }
-    }
-    const pct = totalMonths > 0 ? Math.round(checkedCount / 12 * 100) : 0;
+    const monthly    = Math.ceil(item.yearlyAmount / 12);
+    const savedAmt   = item.savedAmount || 0;
+    const pct        = item.yearlyAmount > 0 ? Math.min(100, Math.round(savedAmt / item.yearlyAmount * 100)) : 0;
     const isDueMonth = nowMonth === item.payMonth;
     const isDue      = isDueMonth && (item.lastPaidYear || 0) < nowYear;
+    const checks     = item.monthlyChecks || {};
     const curKey     = `${nowYear}-${String(nowMonth).padStart(2,'0')}`;
     const checkedNow = !!checks[curKey];
+    const remaining  = Math.max(0, item.yearlyAmount - savedAmt);
+    const barColor   = pct >= 100 ? '#2ecc71' : (isDue ? '#FF6F00' : 'var(--primary)');
 
     return `
     <div class="card" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div>
           <div style="font-size:15px;font-weight:700">${item.name}</div>
           <div style="font-size:12px;color:#9E9E9E">฿${item.yearlyAmount.toLocaleString()}/ปี · จ่าย${MONTHS_SHORT[item.payMonth]} · เดือนละ ฿${monthly.toLocaleString()}</div>
         </div>
         <button class="setting-del" onclick="openAnnualModal('${item.id}')">✏️</button>
       </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;color:#9E9E9E">เก็บได้แล้ว <b style="color:#212121">฿${savedAmt.toLocaleString()}</b> / ฿${item.yearlyAmount.toLocaleString()}</span>
+        <span style="font-size:12px;font-weight:800;color:${barColor}">${pct}%</span>
+      </div>
+      <div class="goal-progress-bar" style="margin-bottom:8px">
+        <div class="goal-progress-fill" style="width:${pct}%;background:${barColor}"></div>
+      </div>
+
       ${isDue ? `
         <div style="background:#FFF3E0;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:13px;font-weight:700;color:#E65100">⚠️ ถึงเวลาจ่ายแล้ว!</span>
           <button onclick="payAnnualCost('${item.id}')" style="background:#FF6F00;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">จ่ายแล้ว ✓</button>
         </div>` : `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:12px;color:#9E9E9E">เก็บแล้ว ${checkedCount}/12 เดือน</span>
-          <span style="font-size:12px;font-weight:700;color:var(--primary)">${pct}%</span>
-        </div>
-        <div class="goal-progress-bar" style="margin-bottom:8px">
-          <div class="goal-progress-fill" style="width:${pct}%;background:var(--primary)"></div>
-        </div>
         <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleAnnualCheck('${item.id}')">
           <div class="fixcost-check ${checkedNow ? 'done' : 'undone'}" style="width:24px;height:24px;flex-shrink:0">${checkedNow ? '✅' : ''}</div>
           <span style="font-size:13px;color:#212121">${checkedNow ? 'เดือนนี้เก็บแล้ว' : 'เดือนนี้ยังไม่ได้เก็บ'} (฿${monthly.toLocaleString()})</span>
@@ -1642,9 +1635,12 @@ function toggleAnnualCheck(id) {
   const item = data.annualCosts.find(i => i.id === id);
   if (!item) return;
   if (!item.monthlyChecks) item.monthlyChecks = {};
-  const now = new Date();
-  const key = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  item.monthlyChecks[key] = !item.monthlyChecks[key];
+  const now      = new Date();
+  const key      = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthly  = Math.ceil(item.yearlyAmount / 12);
+  const wasChecked = !!item.monthlyChecks[key];
+  item.monthlyChecks[key] = !wasChecked;
+  item.savedAmount = Math.max(0, (item.savedAmount || 0) + (wasChecked ? -monthly : monthly));
   saveData(data);
   renderAnnualSection();
 }
@@ -1659,6 +1655,7 @@ function payAnnualCost(id) {
   data.transactions.push({ id: genId(), type: 'expense', category: 'Fix cost', amount: item.yearlyAmount, account: item.account || '', date, note: `${item.name} (รายปี)`, createdAt: Date.now() });
   item.lastPaidYear  = now.getFullYear();
   item.monthlyChecks = {};
+  item.savedAmount   = 0;
   saveData(data);
   renderAnnualSection();
   showToast(`บันทึกรายจ่าย ${item.name} ฿${item.yearlyAmount.toLocaleString()} แล้ว ✅`);
@@ -1666,8 +1663,6 @@ function payAnnualCost(id) {
 
 function openAnnualModal(id) {
   state._editingAnnualId = id || null;
-  const { accounts } = getData();
-  document.getElementById('annual-account').innerHTML = (accounts || []).map(a => `<option value="${a}">${a}</option>`).join('');
   const delBtn = document.getElementById('delete-annual-btn');
   if (id) {
     const item = (getData().annualCosts || []).find(i => i.id === id);
@@ -1675,13 +1670,14 @@ function openAnnualModal(id) {
     document.getElementById('modal-annual-title').textContent = '📅 แก้ไขรายการรายปี';
     document.getElementById('annual-name').value      = item.name;
     document.getElementById('annual-amount').value    = item.yearlyAmount;
+    document.getElementById('annual-saved').value     = item.savedAmount || 0;
     document.getElementById('annual-pay-month').value = item.payMonth;
-    document.getElementById('annual-account').value   = item.account || '';
     delBtn.style.display = 'block';
   } else {
     document.getElementById('modal-annual-title').textContent = '📅 เพิ่มรายการรายปี';
     document.getElementById('annual-name').value      = '';
     document.getElementById('annual-amount').value    = '';
+    document.getElementById('annual-saved').value     = '0';
     document.getElementById('annual-pay-month').value = new Date().getMonth() + 1;
     delBtn.style.display = 'none';
   }
@@ -1689,19 +1685,19 @@ function openAnnualModal(id) {
 }
 
 function saveAnnualItem() {
-  const name     = document.getElementById('annual-name').value.trim();
-  const amount   = parseFloat(document.getElementById('annual-amount').value.replace(/,/g,''));
-  const payMonth = parseInt(document.getElementById('annual-pay-month').value);
-  const account  = document.getElementById('annual-account').value;
+  const name        = document.getElementById('annual-name').value.trim();
+  const amount      = parseFloat(document.getElementById('annual-amount').value.replace(/,/g,''));
+  const savedAmount = parseFloat(document.getElementById('annual-saved').value.replace(/,/g,'')) || 0;
+  const payMonth    = parseInt(document.getElementById('annual-pay-month').value);
   if (!name)               { alert('กรุณากรอกชื่อรายการ'); return; }
   if (!amount || amount<=0){ alert('กรุณากรอกยอดรายปี'); return; }
   const data = getData();
   if (!data.annualCosts) data.annualCosts = [];
   if (state._editingAnnualId) {
     const idx = data.annualCosts.findIndex(i => i.id === state._editingAnnualId);
-    if (idx !== -1) data.annualCosts[idx] = { ...data.annualCosts[idx], name, yearlyAmount: amount, payMonth, account };
+    if (idx !== -1) data.annualCosts[idx] = { ...data.annualCosts[idx], name, yearlyAmount: amount, savedAmount, payMonth };
   } else {
-    data.annualCosts.push({ id: genId(), name, yearlyAmount: amount, payMonth, account, monthlyChecks: {}, lastPaidYear: null });
+    data.annualCosts.push({ id: genId(), name, yearlyAmount: amount, savedAmount, payMonth, monthlyChecks: {}, lastPaidYear: null });
   }
   saveData(data);
   state._editingAnnualId = null;
