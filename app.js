@@ -402,6 +402,7 @@ const state = {
   editingBudgetCat: null,
   editingInstallId: null,
   addInstallId: null,
+  editingGoalId: null,
 };
 
 // ===== FORMAT HELPERS =====
@@ -796,13 +797,14 @@ function renderReports() {
 function switchReportsTab(tab) {
   state.reportsTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['charts','budget','install','fixcost'].forEach(id => {
+  ['charts','budget','install','fixcost','goals'].forEach(id => {
     document.getElementById(`tab-${id}`).style.display = id === tab ? 'block' : 'none';
   });
   if (tab === 'charts')  { renderBarChart(); renderDailyChart(); renderPieChart(); }
   if (tab === 'budget')  renderBudget();
   if (tab === 'install') renderInstalls();
   if (tab === 'fixcost') renderFixcostChecklist();
+  if (tab === 'goals')   renderGoalsTab();
 }
 
 // ---- Charts ----
@@ -1555,6 +1557,88 @@ function deleteFixcostItem() {
   state._editingFixcostId = null;
   closeModal('modal-fixcost');
   renderFixcostChecklist();
+}
+
+// ===== SAVINGS GOALS =====
+
+function renderGoalsTab() {
+  const goals = getData().savingsGoals || [];
+  const container = document.getElementById('goals-container');
+  if (!goals.length) {
+    container.innerHTML = '<div style="text-align:center;padding:32px 16px;color:#9E9E9E;font-size:14px">ยังไม่มีเป้าหมาย<br>กด "+ เพิ่มเป้าหมาย" เพื่อเริ่มต้น</div>';
+    return;
+  }
+  container.innerHTML = goals.map(g => {
+    const pct = g.targetAmount > 0 ? Math.min(100, Math.round((g.savedAmount / g.targetAmount) * 100)) : 0;
+    const done = pct >= 100;
+    return `
+    <div class="card goal-card" onclick="openGoalModal('${g.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:15px;font-weight:700">${done ? '✅ ' : ''}${g.name}</div>
+        <div style="font-size:12px;font-weight:800;color:${done ? 'var(--income-color,#2ecc71)' : 'var(--primary)'}">${pct}%</div>
+      </div>
+      <div class="goal-progress-bar">
+        <div class="goal-progress-fill" style="width:${pct}%;background:${done ? '#2ecc71' : 'var(--primary)'}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:13px;color:#9E9E9E">
+        <span>เก็บได้ <b style="color:var(--text-color,#212121)">฿${Number(g.savedAmount).toLocaleString()}</b></span>
+        <span>เป้า <b style="color:var(--text-color,#212121)">฿${Number(g.targetAmount).toLocaleString()}</b></span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openGoalModal(id) {
+  state.editingGoalId = id || null;
+  const titleEl = document.getElementById('modal-goal-title');
+  const delBtn  = document.getElementById('delete-goal-btn');
+  if (id) {
+    const goal = (getData().savingsGoals || []).find(g => g.id === id);
+    if (!goal) return;
+    titleEl.textContent = 'แก้ไขเป้าหมาย';
+    document.getElementById('goal-name').value   = goal.name;
+    document.getElementById('goal-target').value = goal.targetAmount;
+    document.getElementById('goal-saved').value  = goal.savedAmount;
+    delBtn.style.display = 'block';
+  } else {
+    titleEl.textContent = 'เพิ่มเป้าหมายการเก็บเงิน';
+    document.getElementById('goal-name').value   = '';
+    document.getElementById('goal-target').value = '';
+    document.getElementById('goal-saved').value  = '';
+    delBtn.style.display = 'none';
+  }
+  openModal('modal-goal');
+}
+
+function saveGoal() {
+  const name   = document.getElementById('goal-name').value.trim();
+  const target = parseFloat(document.getElementById('goal-target').value.replace(/,/g,''));
+  const saved  = parseFloat(document.getElementById('goal-saved').value.replace(/,/g,'')) || 0;
+  if (!name)         { alert('กรุณากรอกชื่อเป้าหมาย'); return; }
+  if (!target || target <= 0) { alert('กรุณากรอกจำนวนเงินเป้าหมาย'); return; }
+  const data = getData();
+  if (!data.savingsGoals) data.savingsGoals = [];
+  if (state.editingGoalId) {
+    const idx = data.savingsGoals.findIndex(g => g.id === state.editingGoalId);
+    if (idx !== -1) data.savingsGoals[idx] = { ...data.savingsGoals[idx], name, targetAmount: target, savedAmount: saved };
+  } else {
+    data.savingsGoals.push({ id: genId(), name, targetAmount: target, savedAmount: saved });
+  }
+  saveData(data);
+  state.editingGoalId = null;
+  closeModal('modal-goal');
+  renderGoalsTab();
+}
+
+function deleteGoal() {
+  if (!state.editingGoalId) return;
+  if (!confirm('ลบเป้าหมายนี้?')) return;
+  const data = getData();
+  data.savingsGoals = (data.savingsGoals || []).filter(g => g.id !== state.editingGoalId);
+  saveData(data);
+  state.editingGoalId = null;
+  closeModal('modal-goal');
+  renderGoalsTab();
 }
 
 // ---- Modal helpers ----

@@ -199,6 +199,7 @@
         <button class="tab-btn" data-tab="budget" onclick="switchReportsTab('budget')">🎯 งบ</button>
         <button class="tab-btn" data-tab="install" onclick="switchReportsTab('install')">💳 ผ่อน</button>
         <button class="tab-btn" data-tab="fixcost" onclick="switchReportsTab('fixcost')">✅ ประจำ</button>
+        <button class="tab-btn" data-tab="goals" onclick="switchReportsTab('goals')">🏦 เป้าหมาย</button>
       </div>
 
       <!-- Tab: Charts -->
@@ -248,6 +249,12 @@
       <div id="tab-fixcost" class="tab-content" style="display:none">
         <div id="fixcost-container"></div>
         <button onclick="openAddFixcostItem()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการประจำ</button>
+      </div>
+
+      <!-- Tab: Savings Goals -->
+      <div id="tab-goals" class="tab-content" style="display:none">
+        <div id="goals-container"></div>
+        <button onclick="openGoalModal()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มเป้าหมาย</button>
       </div>
     </div>
 
@@ -695,6 +702,29 @@
     <button onclick="saveFixcostItem()" class="btn-primary">บันทึก</button>
     <button id="delete-fixcost-btn" onclick="deleteFixcostItem()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
     <button onclick="closeModal('modal-fixcost')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Savings Goal Add/Edit ===== -->
+<div id="modal-goal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-goal-title" style="font-size:16px;margin-bottom:14px">เพิ่มเป้าหมายการเก็บเงิน</h3>
+    <div class="form-group">
+      <label class="form-label">ชื่อเป้าหมาย</label>
+      <input type="text" id="goal-name" class="form-input" placeholder="เช่น ซื้อโน้ตบุ๊ก, ท่องเที่ยว">
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวนเงินเป้าหมาย (บาท)</label>
+      <input type="text" inputmode="decimal" id="goal-target" class="form-input" placeholder="30000">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ยอดที่เก็บได้แล้ว (บาท)</label>
+      <input type="text" inputmode="decimal" id="goal-saved" class="form-input" placeholder="0">
+    </div>
+    <button onclick="saveGoal()" class="btn-primary">บันทึก</button>
+    <button id="delete-goal-btn" onclick="deleteGoal()" class="btn-danger" style="display:none;margin-top:8px">ลบเป้าหมายนี้</button>
+    <button onclick="closeModal('modal-goal')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
   </div>
 </div>
 

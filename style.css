@@ -399,3 +399,9 @@ body {
   display: flex; justify-content: space-between;
   padding: 8px 0 12px; font-weight: 700; font-size: 14px;
 }
+
+/* ---- SAVINGS GOALS ---- */
+.goal-card { cursor: pointer; transition: box-shadow .15s; }
+.goal-card:active { box-shadow: 0 0 0 2px var(--primary); }
+.goal-progress-bar { background: #EEEEEE; border-radius: 99px; height: 10px; overflow: hidden; }
+.goal-progress-fill { height: 10px; border-radius: 99px; transition: width .4s ease; }
