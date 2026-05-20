@@ -1,7 +1,9 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 const CHANGELOG = [
+  { v: '3.6', date: '20 พ.ค. 68', note: '💳 ผ่อน: ราคาเต็ม+ดอกเบี้ย คำนวณงวดอัตโนมัติ | แผนเงินเดือน: รวมยอดผ่อน, VAT% ในรายการ, กดแถวเพื่อแก้ไข' },
+  { v: '3.5', date: '20 พ.ค. 68', note: '💰 หน้าเงินเดือน: เพิ่มรายการเองได้ + กำหนดสัดส่วนเบี้ยเลี้ยง/โบนัสเอง' },
   { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
   { v: '2.8', date: '20 พ.ค. 68', note: '⛽ น้ำมัน: กรอกระยะต่อถัง, default 95, ปั้ม dropdown พร้อมเพิ่มเองได้' },
@@ -857,7 +859,10 @@ function _calcAllocation() {
     const remaining = Math.max(0, (goal.targetAmount || 0) - (goal.savedAmount || 0));
     return s + ((mLeft && remaining > 0) ? Math.ceil(remaining / mLeft) : 0);
   }, 0);
-  return { fixedMonthly, annualMonthly, goalsMonthly };
+  const installMonthly = (data.installments || [])
+    .filter(i => i.paidMonths < i.totalMonths)
+    .reduce((s, i) => s + (i.amountPerMonth || 0), 0);
+  return { fixedMonthly, annualMonthly, goalsMonthly, installMonthly };
 }
 
 function _getCurrentSalaryEntry() {
@@ -895,13 +900,16 @@ function _renderSalaryAllocation(entry) {
   // Salary allocation (auto + custom)
   const cfg = getData().salaryConfig || {};
   const customItems = cfg.customItems || [];
-  const { fixedMonthly, annualMonthly, goalsMonthly } = _calcAllocation();
-  const customTotal = customItems.reduce((s, i) => s + (i.amount || 0), 0);
-  const leftover = salary - fixedMonthly - annualMonthly - goalsMonthly - customTotal;
+  const { fixedMonthly, annualMonthly, goalsMonthly, installMonthly } = _calcAllocation();
+  const customTotal = customItems.reduce((s, i) => {
+    const vat = i.vat || 0;
+    return s + Math.round((i.amount || 0) * (1 + vat / 100));
+  }, 0);
+  const leftover = salary - fixedMonthly - annualMonthly - goalsMonthly - installMonthly - customTotal;
 
-  const row = (icon, label, amount, editBtn = '') =>
-    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:14px">${icon} ${label}${editBtn}</span>
+  const row = (icon, label, amount, clickable = false, id = '') =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)${clickable ? ';cursor:pointer' : ''}" ${clickable ? `onclick="openSalaryCustomItemModal('${id}')"` : ''}>
+      <span style="font-size:14px">${icon} ${label}</span>
       <span style="font-weight:700">฿${amount.toLocaleString()}</span>
     </div>`;
 
@@ -909,9 +917,15 @@ function _renderSalaryAllocation(entry) {
     row('📅', 'เก็บรายปี', annualMonthly) +
     row('🎯', 'เป้าหมาย', goalsMonthly);
 
+  if (installMonthly > 0) {
+    allocHtml += row('💳', 'ผ่อนชำระ', installMonthly);
+  }
+
   customItems.forEach(item => {
-    const editBt = ` <button onclick="openSalaryCustomItemModal('${item.id}')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:0 2px">✏️</button>`;
-    allocHtml += row('📌', item.name, item.amount, editBt);
+    const vat = item.vat || 0;
+    const effectiveAmt = Math.round((item.amount || 0) * (1 + vat / 100));
+    const vatLabel = vat > 0 ? ` <span style="font-size:11px;color:#9E9E9E">+VAT ${vat}%</span>` : '';
+    allocHtml += row('📌', item.name + vatLabel, effectiveAmt, true, item.id);
   });
 
   allocHtml += `<div style="text-align:right;padding:6px 0">
@@ -972,12 +986,14 @@ function openSalaryCustomItemModal(id) {
     if (item) {
       document.getElementById('salary-item-name').value   = item.name;
       document.getElementById('salary-item-amount').value = item.amount;
+      document.getElementById('salary-item-vat').value    = item.vat || '';
     }
     document.getElementById('modal-salary-item-title').textContent = 'แก้ไขรายการ';
     document.getElementById('delete-salary-item-btn').style.display = 'block';
   } else {
     document.getElementById('salary-item-name').value   = '';
     document.getElementById('salary-item-amount').value = '';
+    document.getElementById('salary-item-vat').value    = '';
     document.getElementById('modal-salary-item-title').textContent = 'เพิ่มรายการ';
     document.getElementById('delete-salary-item-btn').style.display = 'none';
   }
@@ -987,14 +1003,15 @@ function openSalaryCustomItemModal(id) {
 function saveSalaryCustomItem() {
   const name   = document.getElementById('salary-item-name').value.trim();
   const amount = parseFloat(document.getElementById('salary-item-amount').value.replace(/,/g,'')) || 0;
+  const vat    = parseFloat(document.getElementById('salary-item-vat').value) || 0;
   if (!name || amount <= 0) { alert('กรุณากรอกชื่อและจำนวน'); return; }
   const data = getData();
   const cfg  = data.salaryConfig;
   if (state._editingSalaryItemId) {
     const idx = cfg.customItems.findIndex(i => i.id === state._editingSalaryItemId);
-    if (idx !== -1) cfg.customItems[idx] = { ...cfg.customItems[idx], name, amount };
+    if (idx !== -1) cfg.customItems[idx] = { ...cfg.customItems[idx], name, amount, vat };
   } else {
-    cfg.customItems.push({ id: genId(), name, amount });
+    cfg.customItems.push({ id: genId(), name, amount, vat });
   }
   saveData(data);
   closeModal('modal-salary-item');
@@ -1358,19 +1375,40 @@ function renderInstalls() {
             <span>${inst.paidMonths}/${inst.totalMonths} งวด (${pct}%)</span>
             ${done ? '<span class="install-done">เสร็จสิ้น 🎉</span>' : `<span style="color:#FF1744">เหลือ ฿${fmt(totalRemaining)} (${remaining} งวด)</span>`}
           </div>
+          ${inst.fullPrice ? `<div class="install-account" style="color:#9E9E9E">ราคาเต็ม ฿${fmt(inst.fullPrice)}${inst.interestRate ? ` +${inst.interestRate}% ดอกเบี้ย` : ''}</div>` : ''}
           ${inst.account ? `<div class="install-account">${inst.account}</div>` : ''}
         </div>`;
     }).join('')}`;
 }
 
+function _updateInstallCalc() {
+  const fullPrice = parseFloat((document.getElementById('install-full-price').value || '').replace(/,/g,''));
+  const months    = parseInt(document.getElementById('install-total').value);
+  const rate      = parseFloat(document.getElementById('install-rate').value) || 0;
+  const hint      = document.getElementById('install-calc-hint');
+  if (fullPrice > 0 && months > 0) {
+    const totalWithInterest = fullPrice * (1 + rate / 100);
+    const monthly = Math.ceil(totalWithInterest / months);
+    document.getElementById('install-amount').value = monthly;
+    const rateText = rate > 0 ? ` (+${rate}% ดอกเบี้ย = ฿${Math.round(fullPrice * rate / 100).toLocaleString()})` : '';
+    hint.textContent = `คำนวณ: ฿${fullPrice.toLocaleString()}${rateText} ÷ ${months} งวด = ฿${monthly.toLocaleString()}/งวด`;
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
 function openInstallAdd() {
   state.editingInstallId = null;
   document.getElementById('modal-install-title').textContent = 'เพิ่มรายการผ่อน';
-  document.getElementById('install-name').value   = '';
-  document.getElementById('install-total').value  = '';
-  document.getElementById('install-paid').value   = '0';
-  document.getElementById('install-amount').value = '';
-  document.getElementById('install-note').value   = '';
+  document.getElementById('install-name').value        = '';
+  document.getElementById('install-full-price').value  = '';
+  document.getElementById('install-rate').value        = '';
+  document.getElementById('install-total').value       = '';
+  document.getElementById('install-paid').value        = '0';
+  document.getElementById('install-amount').value      = '';
+  document.getElementById('install-note').value        = '';
+  document.getElementById('install-calc-hint').style.display = 'none';
   document.getElementById('delete-install-btn').style.display = 'none';
   populateInstallAccount(null);
   openModal('modal-install');
@@ -1382,11 +1420,14 @@ function openInstallEdit(id) {
   if (!inst) return;
   state.editingInstallId = id;
   document.getElementById('modal-install-title').textContent = 'แก้ไขรายการผ่อน';
-  document.getElementById('install-name').value   = inst.name;
-  document.getElementById('install-total').value  = inst.totalMonths;
-  document.getElementById('install-paid').value   = inst.paidMonths;
-  document.getElementById('install-amount').value = inst.amountPerMonth;
-  document.getElementById('install-note').value   = inst.note || '';
+  document.getElementById('install-name').value        = inst.name;
+  document.getElementById('install-full-price').value  = inst.fullPrice || '';
+  document.getElementById('install-rate').value        = inst.interestRate || '';
+  document.getElementById('install-total').value       = inst.totalMonths;
+  document.getElementById('install-paid').value        = inst.paidMonths;
+  document.getElementById('install-amount').value      = inst.amountPerMonth;
+  document.getElementById('install-note').value        = inst.note || '';
+  document.getElementById('install-calc-hint').style.display = 'none';
   document.getElementById('delete-install-btn').style.display = 'block';
   populateInstallAccount(inst.account);
   openModal('modal-install');
@@ -1400,12 +1441,14 @@ function populateInstallAccount(selected) {
 }
 
 function saveInstall() {
-  const name   = document.getElementById('install-name').value.trim();
-  const total  = parseInt(document.getElementById('install-total').value);
-  const paid   = parseInt(document.getElementById('install-paid').value);
-  const amount = parseFloat(document.getElementById('install-amount').value.replace(/,/g,''));
-  const acc    = document.getElementById('install-account').value;
-  const note   = document.getElementById('install-note').value.trim();
+  const name         = document.getElementById('install-name').value.trim();
+  const total        = parseInt(document.getElementById('install-total').value);
+  const paid         = parseInt(document.getElementById('install-paid').value);
+  const amount       = parseFloat(document.getElementById('install-amount').value.replace(/,/g,''));
+  const acc          = document.getElementById('install-account').value;
+  const note         = document.getElementById('install-note').value.trim();
+  const fullPrice    = parseFloat((document.getElementById('install-full-price').value || '').replace(/,/g,'')) || 0;
+  const interestRate = parseFloat(document.getElementById('install-rate').value) || 0;
 
   if (!name)                        { alert('กรุณาใส่ชื่อรายการ'); return; }
   if (!total || total <= 0)         { alert('กรุณาใส่จำนวนงวด'); return; }
@@ -1413,12 +1456,13 @@ function saveInstall() {
   if (!amount || amount <= 0)        { alert('กรุณาใส่ยอดต่องวด'); return; }
   if (paid > total)                  { alert('งวดที่ผ่อนแล้วมากกว่าจำนวนงวดทั้งหมด'); return; }
 
+  const obj = { name, totalMonths: total, paidMonths: paid, amountPerMonth: amount, account: acc, note, fullPrice, interestRate };
   const data = getData();
   if (state.editingInstallId) {
     const idx = data.installments.findIndex(i => i.id === state.editingInstallId);
-    if (idx !== -1) data.installments[idx] = { ...data.installments[idx], name, totalMonths: total, paidMonths: paid, amountPerMonth: amount, account: acc, note };
+    if (idx !== -1) data.installments[idx] = { ...data.installments[idx], ...obj };
   } else {
-    data.installments.push({ id: genId(), name, totalMonths: total, paidMonths: paid, amountPerMonth: amount, account: acc, note });
+    data.installments.push({ id: genId(), ...obj });
   }
   saveData(data);
   closeModal('modal-install');

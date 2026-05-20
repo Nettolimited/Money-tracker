@@ -371,8 +371,18 @@
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-group">
+        <label class="form-label">ราคาเต็ม (บาท)</label>
+        <input type="text" inputmode="decimal" id="install-full-price" class="form-input" placeholder="30,800" oninput="_updateInstallCalc()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ดอกเบี้ย (%)</label>
+        <input type="number" step="0.01" id="install-rate" class="form-input" placeholder="0" oninput="_updateInstallCalc()">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group">
         <label class="form-label">จำนวนงวด (ทั้งหมด)</label>
-        <input type="number" id="install-total" class="form-input" placeholder="10">
+        <input type="number" id="install-total" class="form-input" placeholder="10" oninput="_updateInstallCalc()">
       </div>
       <div class="form-group">
         <label class="form-label">ผ่อนไปแล้ว (งวด)</label>
@@ -382,6 +392,7 @@
     <div class="form-group">
       <label class="form-label">ยอดต่องวด (บาท)</label>
       <input type="text" inputmode="decimal" id="install-amount" class="form-input" placeholder="3,080">
+      <div id="install-calc-hint" style="display:none;font-size:12px;color:var(--primary);margin-top:4px"></div>
     </div>
     <div class="form-group">
       <label class="form-label">บัตร / บัญชี</label>
@@ -867,9 +878,15 @@
       <label class="form-label">ชื่อรายการ</label>
       <input type="text" id="salary-item-name" class="form-input" placeholder="เช่น ค่าสุขภาพ, ค่าเกม">
     </div>
-    <div class="form-group">
-      <label class="form-label">จำนวน (บาท/เดือน)</label>
-      <input type="text" inputmode="decimal" id="salary-item-amount" class="form-input" placeholder="0">
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+      <div class="form-group">
+        <label class="form-label">จำนวน (บาท/เดือน)</label>
+        <input type="text" inputmode="decimal" id="salary-item-amount" class="form-input" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">VAT (%)</label>
+        <input type="number" step="0.01" id="salary-item-vat" class="form-input" placeholder="0">
+      </div>
     </div>
     <button onclick="saveSalaryCustomItem()" class="btn-primary">บันทึก</button>
     <button id="delete-salary-item-btn" onclick="deleteSalaryCustomItem()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
