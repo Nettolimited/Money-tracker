@@ -1,6 +1,6 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 const CHANGELOG = [
   { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
@@ -1585,6 +1585,15 @@ function deleteFixcostItem() {
 
 const MONTHS_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
+// Months remaining from NOW until next payMonth occurrence
+function _monthsUntilPay(payMonth) {
+  const m = new Date().getMonth() + 1;
+  const diff = payMonth - m;
+  if (diff > 0) return diff;
+  if (diff < 0) return 12 + diff;
+  return 12; // same month → already paying, plan for next year
+}
+
 function renderAnnualSection() {
   const items    = getData().annualCosts || [];
   const container = document.getElementById('annual-container');
@@ -1597,7 +1606,6 @@ function renderAnnualSection() {
   const nowMonth = now.getMonth() + 1;
 
   container.innerHTML = items.map(item => {
-    const monthly    = Math.ceil(item.yearlyAmount / 12);
     const savedAmt   = item.savedAmount || 0;
     const pct        = item.yearlyAmount > 0 ? Math.min(100, Math.round(savedAmt / item.yearlyAmount * 100)) : 0;
     const isDueMonth = nowMonth === item.payMonth;
@@ -1607,13 +1615,17 @@ function renderAnnualSection() {
     const checkedNow = !!checks[curKey];
     const remaining  = Math.max(0, item.yearlyAmount - savedAmt);
     const barColor   = pct >= 100 ? '#2ecc71' : (isDue ? '#FF6F00' : 'var(--primary)');
+    // Smart monthly: remaining ÷ months left until payment
+    const mLeft      = isDue ? 0 : _monthsUntilPay(item.payMonth);
+    const monthly    = (remaining > 0 && mLeft > 0) ? Math.ceil(remaining / mLeft) : 0;
+    const monthlyLabel = pct >= 100 ? 'เก็บครบแล้ว 🎉' : `฿${monthly.toLocaleString()}/เดือน (อีก ${mLeft} เดือน)`;
 
     return `
     <div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div>
           <div style="font-size:15px;font-weight:700">${item.name}</div>
-          <div style="font-size:12px;color:#9E9E9E">฿${item.yearlyAmount.toLocaleString()}/ปี · จ่าย${MONTHS_SHORT[item.payMonth]} · เดือนละ ฿${monthly.toLocaleString()}</div>
+          <div style="font-size:12px;color:#9E9E9E">฿${item.yearlyAmount.toLocaleString()}/ปี · จ่าย${MONTHS_SHORT[item.payMonth]} · ${monthlyLabel}</div>
         </div>
         <button class="setting-del" onclick="openAnnualModal('${item.id}')">✏️</button>
       </div>
@@ -1630,7 +1642,8 @@ function renderAnnualSection() {
         <div style="background:#FFF3E0;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:13px;font-weight:700;color:#E65100">⚠️ ถึงเวลาจ่ายแล้ว!</span>
           <button onclick="payAnnualCost('${item.id}')" style="background:#FF6F00;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">จ่ายแล้ว ✓</button>
-        </div>` : `
+        </div>` : pct >= 100 ? `
+        <div style="background:#E8F5E9;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;color:#2e7d32">✅ เก็บครบแล้ว รอวันจ่าย${MONTHS_SHORT[item.payMonth]}</div>` : `
         <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleAnnualCheck('${item.id}')">
           <div class="fixcost-check ${checkedNow ? 'done' : 'undone'}" style="width:24px;height:24px;flex-shrink:0">${checkedNow ? '✅' : ''}</div>
           <span style="font-size:13px;color:#212121">${checkedNow ? 'เดือนนี้เก็บแล้ว' : 'เดือนนี้ยังไม่ได้เก็บ'} (฿${monthly.toLocaleString()})</span>
@@ -1645,12 +1658,24 @@ function toggleAnnualCheck(id) {
   const item = data.annualCosts.find(i => i.id === id);
   if (!item) return;
   if (!item.monthlyChecks) item.monthlyChecks = {};
-  const now      = new Date();
-  const key      = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const monthly  = Math.ceil(item.yearlyAmount / 12);
+  const now  = new Date();
+  const key  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const wasChecked = !!item.monthlyChecks[key];
-  item.monthlyChecks[key] = !wasChecked;
-  item.savedAmount = Math.max(0, (item.savedAmount || 0) + (wasChecked ? -monthly : monthly));
+  if (!wasChecked) {
+    // Calculate smart monthly at time of checking
+    const remaining = Math.max(0, item.yearlyAmount - (item.savedAmount || 0));
+    const mLeft     = _monthsUntilPay(item.payMonth);
+    const monthly   = (remaining > 0 && mLeft > 0) ? Math.ceil(remaining / mLeft) : 0;
+    item.monthlyChecks[key] = monthly; // store amount used
+    item.savedAmount = (item.savedAmount || 0) + monthly;
+  } else {
+    // Backward compat: old data stored true/false, new stores number
+    const prevAmt = typeof item.monthlyChecks[key] === 'number'
+      ? item.monthlyChecks[key]
+      : Math.ceil(item.yearlyAmount / 12);
+    item.savedAmount = Math.max(0, (item.savedAmount || 0) - prevAmt);
+    delete item.monthlyChecks[key];
+  }
   saveData(data);
   renderAnnualSection();
 }
