@@ -1,6 +1,6 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.0';
+const APP_VERSION = '3.1';
 const CHANGELOG = [
   { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
@@ -65,6 +65,7 @@ const PALETTE = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#9
 
 let _appData = null;
 let _lastSaveTime = 0;
+let _pendingFirebaseSave = false;
 
 function applyDefaults(data) {
   if (!data.categories)           data.categories     = DEFAULT_CATEGORIES;
@@ -191,10 +192,11 @@ function saveData(data) {
   _lastSaveTime = Date.now();
   localStorage.setItem('financeApp_v1', JSON.stringify(data));
   if (window._db) {
+    _pendingFirebaseSave = true;
     setSyncStatus('saving');
     window._db.ref('appData').set(toFirebase(data))
-      .then(() => setSyncStatus('ok'))
-      .catch(() => setSyncStatus('offline'));
+      .then(() => { _pendingFirebaseSave = false; setSyncStatus('ok'); })
+      .catch(() => { _pendingFirebaseSave = false; setSyncStatus('offline'); });
   } else {
     setSyncStatus('offline');
   }
@@ -343,7 +345,7 @@ async function initSync() {
         done();
         return;
       }
-      if (Date.now() - _lastSaveTime < 3000) return;
+      if (_pendingFirebaseSave || Date.now() - _lastSaveTime < 5000) return;
       if (!snap.exists()) return;
       _appData = fromFirebase(snap.val());
       applyDefaults(_appData);
