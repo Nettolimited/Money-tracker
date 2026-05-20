@@ -801,7 +801,7 @@ function switchReportsTab(tab) {
   ['charts','budget','install','fixcost','goals'].forEach(id => {
     document.getElementById(`tab-${id}`).style.display = id === tab ? 'block' : 'none';
   });
-  if (tab === 'charts')  { renderBarChart(); renderDailyChart(); renderPieChart(); }
+  if (tab === 'charts')  { requestAnimationFrame(() => { renderBarChart(); renderDailyChart(); renderPieChart(); }); }
   if (tab === 'budget')  renderBudget();
   if (tab === 'install') renderInstalls();
   if (tab === 'fixcost') renderFixcostChecklist();
@@ -894,7 +894,8 @@ function renderDailyChart() {
   });
 
   // Dynamic width: 44px per day, min fills container
-  const minW = document.getElementById('daily-chart-scroll').clientWidth || 320;
+  const scrollEl = document.getElementById('daily-chart-scroll');
+  const minW = (scrollEl.clientWidth > 0 ? scrollEl.clientWidth : scrollEl.offsetWidth) || window.innerWidth || 320;
   const calcW = Math.max(minW, allDays.length * 44 + 60);
   wrap.style.width = calcW + 'px';
 
