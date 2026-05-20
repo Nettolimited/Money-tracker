@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.6';
+const APP_VERSION = '2.7';
 const CHANGELOG = [
+  { v: '2.7', date: '20 พ.ค. 68', note: 'Tab bar 2 แถว + ⛽ น้ำมันเชื่อมรายจ่าย BRV อัตโนมัติ' },
   { v: '2.6', date: '20 พ.ค. 68', note: 'เพิ่มแท็บ ⛽ น้ำมัน — บันทึกการเติม, คำนวณ กม./ลิตร และ บาท/กม. อัตโนมัติ' },
   { v: '2.5', date: '20 พ.ค. 68', note: 'เพิ่มแท็บ 🏦 เป้าหมายการเก็บเงิน — ตั้งเป้า, ติดตามยอด, Progress bar' },
   { v: '2.4', date: '18 พ.ค. 68', note: 'กราฟรายวัน dual-axis แยก income/expense scale + Pie chart เรียงมากสุดก่อน + กดไปรายงาน + Swipe เปลี่ยนหน้า + Version header + ชื่อแอพแก้ได้' },
@@ -1722,8 +1723,11 @@ function renderFuelTab() {
 
 function openFuelModal(id) {
   state.editingFuelId = id || null;
-  const delBtn = document.getElementById('delete-fuel-btn');
+  const delBtn  = document.getElementById('delete-fuel-btn');
   const titleEl = document.getElementById('modal-fuel-title');
+  const { accounts } = getData();
+  const accSel  = document.getElementById('fuel-account');
+  accSel.innerHTML = (accounts || []).map(a => `<option value="${a}">${a}</option>`).join('');
   if (id) {
     const log = (getData().fuelLogs || []).find(l => l.id === id);
     if (!log) return;
@@ -1733,6 +1737,7 @@ function openFuelModal(id) {
     document.getElementById('fuel-liters').value    = log.liters;
     document.getElementById('fuel-cost').value      = log.cost;
     document.getElementById('fuel-type').value      = log.fuelType;
+    accSel.value = log.account || (accounts && accounts[0]) || '';
     document.getElementById('fuel-station').value   = log.station || '';
     delBtn.style.display = 'block';
   } else {
@@ -1742,6 +1747,7 @@ function openFuelModal(id) {
     document.getElementById('fuel-liters').value    = '';
     document.getElementById('fuel-cost').value      = '';
     document.getElementById('fuel-type').value      = 'B7';
+    accSel.value = accounts && accounts[0] ? accounts[0] : '';
     document.getElementById('fuel-station').value   = '';
     delBtn.style.display = 'none';
   }
@@ -1754,19 +1760,36 @@ function saveFuel() {
   const liters    = parseFloat(document.getElementById('fuel-liters').value);
   const cost      = parseFloat(document.getElementById('fuel-cost').value);
   const fuelType  = document.getElementById('fuel-type').value;
+  const account   = document.getElementById('fuel-account').value;
   const station   = document.getElementById('fuel-station').value.trim();
-  if (!date)             { alert('กรุณาเลือกวันที่'); return; }
+  if (!date)                      { alert('กรุณาเลือกวันที่'); return; }
   if (!odometer || odometer <= 0) { alert('กรุณากรอกเลขไมล์'); return; }
   if (!liters || liters <= 0)     { alert('กรุณากรอกจำนวนลิตร'); return; }
   if (!cost || cost <= 0)         { alert('กรุณากรอกราคารวม'); return; }
+
   const data = getData();
   if (!data.fuelLogs) data.fuelLogs = [];
+  if (!data.transactions) data.transactions = [];
+
+  const txNote = `เติมน้ำมัน ${fuelType} ${liters} ลิตร${station ? ' · ' + station : ''}`;
+
   if (state.editingFuelId) {
     const idx = data.fuelLogs.findIndex(l => l.id === state.editingFuelId);
-    if (idx !== -1) data.fuelLogs[idx] = { ...data.fuelLogs[idx], date, odometer, liters, cost, fuelType, station };
+    if (idx !== -1) {
+      const old = data.fuelLogs[idx];
+      data.fuelLogs[idx] = { ...old, date, odometer, liters, cost, fuelType, account, station };
+      // อัพเดท transaction ที่เชื่อมอยู่
+      if (old.txId) {
+        const tIdx = data.transactions.findIndex(t => t.id === old.txId);
+        if (tIdx !== -1) data.transactions[tIdx] = { ...data.transactions[tIdx], date, amount: cost, account, note: txNote };
+      }
+    }
   } else {
-    data.fuelLogs.push({ id: genId(), date, odometer, liters, cost, fuelType, station });
+    const txId = genId();
+    data.transactions.push({ id: txId, type: 'expense', category: 'BRV', amount: cost, account, date, note: txNote, createdAt: Date.now() });
+    data.fuelLogs.push({ id: genId(), date, odometer, liters, cost, fuelType, account, station, txId });
   }
+
   saveData(data);
   state.editingFuelId = null;
   closeModal('modal-fuel');
@@ -1775,8 +1798,11 @@ function saveFuel() {
 
 function deleteFuel() {
   if (!state.editingFuelId) return;
-  if (!confirm('ลบรายการนี้?')) return;
+  if (!confirm('ลบรายการนี้? (รายจ่าย BRV ที่เชื่อมไว้จะถูกลบด้วย)')) return;
   const data = getData();
+  const log  = (data.fuelLogs || []).find(l => l.id === state.editingFuelId);
+  // ลบ transaction ที่เชื่อมด้วย
+  if (log && log.txId) data.transactions = data.transactions.filter(t => t.id !== log.txId);
   data.fuelLogs = (data.fuelLogs || []).filter(l => l.id !== state.editingFuelId);
   saveData(data);
   state.editingFuelId = null;
