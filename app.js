@@ -1,6 +1,6 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 const CHANGELOG = [
   { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
@@ -181,9 +181,17 @@ function toFirebase(data) {
 }
 function fromFirebase(data) {
   if (!data) return data;
+  const _toArr = v => (!v ? [] : Array.isArray(v) ? v : Object.values(v));
   return { ...data,
-    budgets:      _decodeKeys(data.budgets      || {}),
-    fixcostChecks:_decodeKeys(data.fixcostChecks|| {}),
+    budgets:        _decodeKeys(data.budgets        || {}),
+    fixcostChecks:  _decodeKeys(data.fixcostChecks  || {}),
+    transactions:   _toArr(data.transactions),
+    installments:   _toArr(data.installments),
+    fixcostItems:   _toArr(data.fixcostItems),
+    recurringItems: _toArr(data.recurringItems),
+    annualCosts:    _toArr(data.annualCosts),
+    savingsGoals:   _toArr(data.savingsGoals),
+    fuelLogs:       _toArr(data.fuelLogs),
   };
 }
 
@@ -1695,9 +1703,18 @@ function saveAnnualItem() {
   if (!amount || amount<=0){ alert('กรุณากรอกยอดรายปี'); return; }
   const data = getData();
   if (!data.annualCosts) data.annualCosts = [];
+  // Defensive: Firebase may return array-like object
+  if (!Array.isArray(data.annualCosts)) data.annualCosts = Object.values(data.annualCosts);
   if (state._editingAnnualId) {
     const idx = data.annualCosts.findIndex(i => i.id === state._editingAnnualId);
-    if (idx !== -1) data.annualCosts[idx] = { ...data.annualCosts[idx], name, yearlyAmount: amount, savedAmount, payMonth };
+    if (idx !== -1) {
+      data.annualCosts[idx] = { ...data.annualCosts[idx], name, yearlyAmount: amount, savedAmount, payMonth };
+    } else {
+      showToast('⚠️ ไม่พบรายการ กรุณาลองใหม่');
+      state._editingAnnualId = null;
+      closeModal('modal-annual');
+      return;
+    }
   } else {
     data.annualCosts.push({ id: genId(), name, yearlyAmount: amount, savedAmount, payMonth, monthlyChecks: {}, lastPaidYear: null });
   }
@@ -1705,6 +1722,7 @@ function saveAnnualItem() {
   state._editingAnnualId = null;
   closeModal('modal-annual');
   renderAnnualSection();
+  showToast(`✅ บันทึก ${name} เก็บแล้ว ฿${savedAmount.toLocaleString()}`);
 }
 
 function deleteAnnualItem() {
