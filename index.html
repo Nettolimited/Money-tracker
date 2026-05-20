@@ -279,11 +279,17 @@
         <div id="salary-summary" style="margin-top:10px"></div>
       </div>
 
-      <!-- Allocation breakdown -->
+      <!-- Allocation: salary -->
       <div class="card" id="salary-allocation-card" style="display:none">
-        <div class="section-title" style="margin-bottom:12px">📊 แผนการใช้เงิน</div>
+        <div class="section-title" style="margin-bottom:12px">📊 แผนเงินเดือน</div>
         <div id="salary-allocation"></div>
       </div>
+
+      <!-- Allocation: allowance splits -->
+      <div class="card" id="salary-allowance-card" style="display:none"></div>
+
+      <!-- Allocation: bonus splits -->
+      <div class="card" id="salary-bonus-card" style="display:none"></div>
 
       <!-- Sub-tabs: ประจำ | เป้าหมาย -->
       <div class="tab-bar tab-bar-2">
@@ -849,6 +855,41 @@
     <button onclick="saveFuel()" class="btn-primary">บันทึก</button>
     <button id="delete-fuel-btn" onclick="deleteFuel()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
     <button onclick="closeModal('modal-fuel')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Salary Custom Item ===== -->
+<div id="modal-salary-item" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-salary-item-title" style="font-size:16px;margin-bottom:14px">เพิ่มรายการ</h3>
+    <div class="form-group">
+      <label class="form-label">ชื่อรายการ</label>
+      <input type="text" id="salary-item-name" class="form-input" placeholder="เช่น ค่าสุขภาพ, ค่าเกม">
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวน (บาท/เดือน)</label>
+      <input type="text" inputmode="decimal" id="salary-item-amount" class="form-input" placeholder="0">
+    </div>
+    <button onclick="saveSalaryCustomItem()" class="btn-primary">บันทึก</button>
+    <button id="delete-salary-item-btn" onclick="deleteSalaryCustomItem()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>
+    <button onclick="closeModal('modal-salary-item')" style="display:block;width:100%;margin-top:10px;padding:12px;background:none;border:none;color:#9E9E9E;cursor:pointer;font-family:inherit;font-size:14px">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: Splits Editor ===== -->
+<div id="modal-splits" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-splits-title" style="font-size:16px;margin-bottom:12px">✏️ สัดส่วน</h3>
+    <div id="splits-list" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <input type="text" id="split-name" class="form-input" placeholder="ชื่อ เช่น เก็บ" style="flex:2;margin:0">
+      <input type="text" inputmode="decimal" id="split-pct" class="form-input" placeholder="%" style="flex:1;margin:0">
+      <button onclick="addSplitItem()" class="btn-primary" style="padding:10px 14px;white-space:nowrap">+ เพิ่ม</button>
+    </div>
+    <div id="splits-total" style="text-align:right;font-size:13px;color:#9E9E9E;margin-bottom:12px"></div>
+    <button onclick="closeModal('modal-splits')" class="btn-secondary">ปิด</button>
   </div>
 </div>
 

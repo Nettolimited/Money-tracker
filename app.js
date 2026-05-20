@@ -1,6 +1,6 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.5';
 const CHANGELOG = [
   { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
@@ -79,6 +79,10 @@ function applyDefaults(data) {
   if (!data.recurringItems)       data.recurringItems = [];
   if (!data.appName)              data.appName        = 'บัญชีส่วนตัว';
   if (!data.salaryData)           data.salaryData     = {};
+  if (!data.salaryConfig)         data.salaryConfig   = { customItems: [], allowanceSplits: [], bonusSplits: [] };
+  if (!data.salaryConfig.customItems)     data.salaryConfig.customItems     = [];
+  if (!data.salaryConfig.allowanceSplits) data.salaryConfig.allowanceSplits = [];
+  if (!data.salaryConfig.bonusSplits)     data.salaryConfig.bonusSplits     = [];
 }
 
 function getData() {
@@ -193,6 +197,12 @@ function fromFirebase(data) {
     annualCosts:    _toArr(data.annualCosts),
     savingsGoals:   _toArr(data.savingsGoals),
     fuelLogs:       _toArr(data.fuelLogs),
+    salaryConfig:   data.salaryConfig ? {
+      ...data.salaryConfig,
+      customItems:     _toArr(data.salaryConfig.customItems),
+      allowanceSplits: _toArr(data.salaryConfig.allowanceSplits),
+      bonusSplits:     _toArr(data.salaryConfig.bonusSplits),
+    } : undefined,
   };
 }
 
@@ -423,9 +433,11 @@ const state = {
   editingGoalId: null,
   editingFuelId: null,
   _editingAnnualId: null,
-  salaryTab:   'fixcost',
-  salaryMonth: new Date().getMonth(),
-  salaryYear:  new Date().getFullYear(),
+  salaryTab:            'fixcost',
+  salaryMonth:          new Date().getMonth(),
+  salaryYear:           new Date().getFullYear(),
+  _editingSalaryItemId: null,
+  _editingSplitsType:   null,
 };
 
 // ===== FORMAT HELPERS =====
@@ -848,44 +860,205 @@ function _calcAllocation() {
   return { fixedMonthly, annualMonthly, goalsMonthly };
 }
 
+function _getCurrentSalaryEntry() {
+  const key = `${state.salaryYear}-${String(state.salaryMonth + 1).padStart(2,'0')}`;
+  return (getData().salaryData || {})[key] || {};
+}
+
 function _renderSalaryAllocation(entry) {
   const salary    = entry.salary    || 0;
   const allowance = entry.allowance || 0;
   const bonus     = entry.bonus     || 0;
-  const total     = salary + allowance + bonus;
   const summaryEl = document.getElementById('salary-summary');
   const allocEl   = document.getElementById('salary-allocation');
   const allocCard = document.getElementById('salary-allocation-card');
+  const hideExtras = () => {
+    ['salary-allowance-card','salary-bonus-card'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+  };
 
-  if (!total) { summaryEl.innerHTML = ''; allocCard.style.display = 'none'; return; }
+  if (!salary && !allowance && !bonus) {
+    summaryEl.innerHTML = '';
+    allocCard.style.display = 'none';
+    hideExtras();
+    return;
+  }
 
-  let html = '';
-  if (salary)    html += `<span style="font-size:12px;color:#9E9E9E;margin-right:8px">เงินเดือน ฿${salary.toLocaleString()}</span>`;
-  if (allowance) html += `<span style="font-size:12px;color:#9E9E9E;margin-right:8px">เบี้ยเลี้ยง ฿${allowance.toLocaleString()}</span>`;
-  if (bonus)     html += `<span style="font-size:12px;color:#9E9E9E">โบนัส ฿${bonus.toLocaleString()}</span>`;
-  html += `<div style="font-size:20px;font-weight:800;color:var(--primary);margin-top:4px">รวม ฿${total.toLocaleString()}</div>`;
-  summaryEl.innerHTML = html;
+  // Summary line
+  let sumHtml = '';
+  if (salary)    sumHtml += `<span style="font-size:12px;color:#9E9E9E;margin-right:8px">เงินเดือน ฿${salary.toLocaleString()}</span>`;
+  if (allowance) sumHtml += `<span style="font-size:12px;color:#9E9E9E;margin-right:8px">เบี้ยเลี้ยง ฿${allowance.toLocaleString()}</span>`;
+  if (bonus)     sumHtml += `<span style="font-size:12px;color:#9E9E9E">โบนัส ฿${bonus.toLocaleString()}</span>`;
+  summaryEl.innerHTML = sumHtml;
 
+  // Salary allocation (auto + custom)
+  const cfg = getData().salaryConfig || {};
+  const customItems = cfg.customItems || [];
   const { fixedMonthly, annualMonthly, goalsMonthly } = _calcAllocation();
-  const totalAlloc = fixedMonthly + annualMonthly + goalsMonthly;
-  const leftover   = total - totalAlloc;
+  const customTotal = customItems.reduce((s, i) => s + (i.amount || 0), 0);
+  const leftover = salary - fixedMonthly - annualMonthly - goalsMonthly - customTotal;
 
-  const row = (icon, label, amount) => {
-    const pct = total > 0 ? Math.round(amount / total * 100) : 0;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:14px">${icon} ${label} <span style="font-size:11px;color:#9E9E9E">${pct}%</span></span>
+  const row = (icon, label, amount, editBtn = '') =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px">${icon} ${label}${editBtn}</span>
       <span style="font-weight:700">฿${amount.toLocaleString()}</span>
     </div>`;
-  };
-  allocEl.innerHTML =
-    row('💸', 'ประจำรายเดือน', fixedMonthly) +
+
+  let allocHtml = row('💸', 'ประจำรายเดือน', fixedMonthly) +
     row('📅', 'เก็บรายปี', annualMonthly) +
-    row('🎯', 'เป้าหมาย', goalsMonthly) +
-    `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 2px;margin-top:4px">
-      <span style="font-size:15px;font-weight:700">${leftover >= 0 ? '🟢' : '🔴'} เหลือใช้จ่ายได้</span>
-      <span style="font-size:20px;font-weight:800;color:${leftover >= 0 ? '#2ecc71' : '#e74c3c'}">฿${leftover.toLocaleString()}</span>
-    </div>`;
-  allocCard.style.display = 'block';
+    row('🎯', 'เป้าหมาย', goalsMonthly);
+
+  customItems.forEach(item => {
+    const editBt = ` <button onclick="openSalaryCustomItemModal('${item.id}')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:0 2px">✏️</button>`;
+    allocHtml += row('📌', item.name, item.amount, editBt);
+  });
+
+  allocHtml += `<div style="text-align:right;padding:6px 0">
+    <button onclick="openSalaryCustomItemModal()" class="btn-secondary" style="font-size:12px;padding:5px 12px">+ เพิ่มรายการ</button>
+  </div>`;
+  allocHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 2px;margin-top:2px">
+    <span style="font-size:15px;font-weight:700">${leftover >= 0 ? '🟢' : '🔴'} เหลือใช้จ่ายได้</span>
+    <span style="font-size:20px;font-weight:800;color:${leftover >= 0 ? '#2ecc71' : '#e74c3c'}">฿${leftover.toLocaleString()}</span>
+  </div>`;
+
+  allocEl.innerHTML = allocHtml;
+  allocCard.style.display = salary ? 'block' : 'none';
+
+  // Allowance & bonus cards
+  _renderExtraIncomeCard('allowance', allowance, cfg.allowanceSplits || []);
+  _renderExtraIncomeCard('bonus',     bonus,     cfg.bonusSplits     || []);
+}
+
+function _renderExtraIncomeCard(type, amount, splits) {
+  const card = document.getElementById(`salary-${type}-card`);
+  if (!card) return;
+  if (!amount) { card.style.display = 'none'; return; }
+  const titleMap = { allowance: '💼 เบี้ยเลี้ยง', bonus: '🎁 โบนัส' };
+  const totalPct  = splits.reduce((s, sp) => s + (sp.pct || 0), 0);
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div>
+      <div class="section-title" style="margin:0">${titleMap[type]}</div>
+      <div style="font-size:15px;font-weight:800;color:var(--primary)">฿${amount.toLocaleString()}</div>
+    </div>
+    <button onclick="openSplitsModal('${type}')" class="setting-del">✏️</button>
+  </div>`;
+  if (!splits.length) {
+    html += `<div style="text-align:center;color:#9E9E9E;font-size:13px;padding:8px 0">กดปุ่ม ✏️ เพื่อตั้งสัดส่วน</div>`;
+  } else {
+    splits.forEach(sp => {
+      const amt = Math.round(amount * (sp.pct || 0) / 100);
+      html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:14px">${sp.name} <span style="font-size:11px;color:#9E9E9E">${sp.pct}%</span></span>
+        <span style="font-weight:700">฿${amt.toLocaleString()}</span>
+      </div>`;
+    });
+    if (totalPct < 100) {
+      const unalloc = Math.round(amount * (100 - totalPct) / 100);
+      html += `<div style="display:flex;justify-content:space-between;padding:6px 0;color:#9E9E9E;font-size:13px">
+        <span>ยังไม่ได้จัดสรร (${100 - totalPct}%)</span><span>฿${unalloc.toLocaleString()}</span>
+      </div>`;
+    }
+  }
+  card.innerHTML = html;
+  card.style.display = 'block';
+}
+
+// -- Custom salary items --
+function openSalaryCustomItemModal(id) {
+  state._editingSalaryItemId = id || null;
+  if (id) {
+    const item = (getData().salaryConfig.customItems || []).find(i => i.id === id);
+    if (item) {
+      document.getElementById('salary-item-name').value   = item.name;
+      document.getElementById('salary-item-amount').value = item.amount;
+    }
+    document.getElementById('modal-salary-item-title').textContent = 'แก้ไขรายการ';
+    document.getElementById('delete-salary-item-btn').style.display = 'block';
+  } else {
+    document.getElementById('salary-item-name').value   = '';
+    document.getElementById('salary-item-amount').value = '';
+    document.getElementById('modal-salary-item-title').textContent = 'เพิ่มรายการ';
+    document.getElementById('delete-salary-item-btn').style.display = 'none';
+  }
+  openModal('modal-salary-item');
+}
+
+function saveSalaryCustomItem() {
+  const name   = document.getElementById('salary-item-name').value.trim();
+  const amount = parseFloat(document.getElementById('salary-item-amount').value.replace(/,/g,'')) || 0;
+  if (!name || amount <= 0) { alert('กรุณากรอกชื่อและจำนวน'); return; }
+  const data = getData();
+  const cfg  = data.salaryConfig;
+  if (state._editingSalaryItemId) {
+    const idx = cfg.customItems.findIndex(i => i.id === state._editingSalaryItemId);
+    if (idx !== -1) cfg.customItems[idx] = { ...cfg.customItems[idx], name, amount };
+  } else {
+    cfg.customItems.push({ id: genId(), name, amount });
+  }
+  saveData(data);
+  closeModal('modal-salary-item');
+  _renderSalaryAllocation(_getCurrentSalaryEntry());
+}
+
+function deleteSalaryCustomItem() {
+  if (!state._editingSalaryItemId) return;
+  const data = getData();
+  data.salaryConfig.customItems = data.salaryConfig.customItems.filter(i => i.id !== state._editingSalaryItemId);
+  saveData(data);
+  closeModal('modal-salary-item');
+  _renderSalaryAllocation(_getCurrentSalaryEntry());
+}
+
+// -- Splits modal --
+function openSplitsModal(type) {
+  state._editingSplitsType = type;
+  document.getElementById('modal-splits-title').textContent = `✏️ สัดส่วน${type === 'allowance' ? 'เบี้ยเลี้ยง' : 'โบนัส'}`;
+  document.getElementById('split-name').value = '';
+  document.getElementById('split-pct').value  = '';
+  _renderSplitsList();
+  openModal('modal-splits');
+}
+
+function _renderSplitsList() {
+  const type   = state._editingSplitsType;
+  const key    = type === 'allowance' ? 'allowanceSplits' : 'bonusSplits';
+  const splits = (getData().salaryConfig || {})[key] || [];
+  const total  = splits.reduce((s, sp) => s + (sp.pct || 0), 0);
+  document.getElementById('splits-list').innerHTML = splits.length
+    ? splits.map(sp => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:14px">${sp.name} — <b>${sp.pct}%</b></span>
+          <button onclick="deleteSplitItem('${sp.id}')" style="background:none;border:none;color:#e74c3c;font-size:18px;cursor:pointer;padding:0 4px">✕</button>
+        </div>`).join('')
+    : `<div style="color:#9E9E9E;font-size:13px;text-align:center;padding:8px">ยังไม่มีสัดส่วน</div>`;
+  document.getElementById('splits-total').innerHTML =
+    `รวม: <b style="color:${total === 100 ? '#2ecc71' : (total > 100 ? '#e74c3c' : '#FF6F00')}">${total}%</b> ${total === 100 ? '✓' : total > 100 ? '⚠️ เกิน!' : `(เหลือ ${100-total}%)`}`;
+}
+
+function addSplitItem() {
+  const name = document.getElementById('split-name').value.trim();
+  const pct  = parseInt(document.getElementById('split-pct').value) || 0;
+  if (!name || pct <= 0 || pct > 100) { alert('กรุณากรอกชื่อและ % ที่ถูกต้อง'); return; }
+  const type = state._editingSplitsType;
+  const data = getData();
+  const key  = type === 'allowance' ? 'allowanceSplits' : 'bonusSplits';
+  data.salaryConfig[key].push({ id: genId(), name, pct });
+  saveData(data);
+  document.getElementById('split-name').value = '';
+  document.getElementById('split-pct').value  = '';
+  _renderSplitsList();
+  _renderExtraIncomeCard(type, _getCurrentSalaryEntry()[type === 'allowance' ? 'allowance' : 'bonus'] || 0, data.salaryConfig[key]);
+}
+
+function deleteSplitItem(id) {
+  const type = state._editingSplitsType;
+  const data = getData();
+  const key  = type === 'allowance' ? 'allowanceSplits' : 'bonusSplits';
+  data.salaryConfig[key] = data.salaryConfig[key].filter(sp => sp.id !== id);
+  saveData(data);
+  _renderSplitsList();
+  _renderExtraIncomeCard(type, _getCurrentSalaryEntry()[type === 'allowance' ? 'allowance' : 'bonus'] || 0, data.salaryConfig[key]);
 }
 
 function renderSalaryPage() {
