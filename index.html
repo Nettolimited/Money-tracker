@@ -193,13 +193,11 @@
         <button id="chart-next">&#8250;</button>
       </div>
 
-      <!-- Tab bar -->
-      <div class="tab-bar">
+      <!-- Tab bar (4 tabs) -->
+      <div class="tab-bar tab-bar-4">
         <button class="tab-btn active" data-tab="charts" onclick="switchReportsTab('charts')">📊 กราฟ</button>
         <button class="tab-btn" data-tab="budget" onclick="switchReportsTab('budget')">🎯 งบ</button>
         <button class="tab-btn" data-tab="install" onclick="switchReportsTab('install')">💳 ผ่อน</button>
-        <button class="tab-btn" data-tab="fixcost" onclick="switchReportsTab('fixcost')">✅ ประจำ</button>
-        <button class="tab-btn" data-tab="goals" onclick="switchReportsTab('goals')">🏦 เป้าหมาย</button>
         <button class="tab-btn" data-tab="fuel" onclick="switchReportsTab('fuel')">⛽ น้ำมัน</button>
       </div>
 
@@ -246,28 +244,67 @@
         <button onclick="openInstallAdd()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มรายการผ่อน</button>
       </div>
 
-      <!-- Tab: Fix cost checklist -->
-      <div id="tab-fixcost" class="tab-content" style="display:none">
-        <div class="section-title" style="margin-bottom:8px">💸 จ่ายทุกเดือน</div>
-        <div id="fixcost-container"></div>
-        <button onclick="openAddFixcostItem()" class="btn-secondary" style="margin-bottom:16px">+ เพิ่มรายการรายเดือน</button>
-
-        <div class="section-title" style="margin-bottom:8px">📅 เก็บสำหรับรายปี</div>
-        <div id="annual-container"></div>
-        <button onclick="openAnnualModal()" class="btn-secondary" style="margin-bottom:12px">+ เพิ่มรายการรายปี</button>
-      </div>
-
-      <!-- Tab: Savings Goals -->
-      <div id="tab-goals" class="tab-content" style="display:none">
-        <div id="goals-container"></div>
-        <button onclick="openGoalModal()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มเป้าหมาย</button>
-      </div>
-
       <!-- Tab: Fuel -->
       <div id="tab-fuel" class="tab-content" style="display:none">
         <div id="fuel-summary" class="card" style="display:none"></div>
         <div id="fuel-container"></div>
         <button onclick="openFuelModal()" class="btn-primary" style="margin-bottom:12px">+ บันทึกการเติมน้ำมัน</button>
+      </div>
+    </div>
+
+    <!-- ===== SALARY PLANNER ===== -->
+    <div id="page-salary" class="page">
+      <div class="month-selector">
+        <button id="salary-prev">&#8249;</button>
+        <span id="salary-month-label"></span>
+        <button id="salary-next">&#8250;</button>
+      </div>
+
+      <!-- Income input -->
+      <div class="card">
+        <div class="section-title" style="margin-bottom:12px">💰 รายได้เดือนนี้</div>
+        <div class="form-group">
+          <label class="form-label">เงินเดือน (บาท)</label>
+          <input type="text" inputmode="decimal" id="salary-base" class="form-input" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">เบี้ยเลี้ยง (บาท)</label>
+          <input type="text" inputmode="decimal" id="salary-allow" class="form-input" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">โบนัส (บาท)</label>
+          <input type="text" inputmode="decimal" id="salary-bonus" class="form-input" placeholder="0">
+        </div>
+        <button onclick="saveSalaryEntry()" class="btn-primary">บันทึก</button>
+        <div id="salary-summary" style="margin-top:10px"></div>
+      </div>
+
+      <!-- Allocation breakdown -->
+      <div class="card" id="salary-allocation-card" style="display:none">
+        <div class="section-title" style="margin-bottom:12px">📊 แผนการใช้เงิน</div>
+        <div id="salary-allocation"></div>
+      </div>
+
+      <!-- Sub-tabs: ประจำ | เป้าหมาย -->
+      <div class="tab-bar tab-bar-2">
+        <button class="tab-btn active" data-stab="fixcost" onclick="switchSalaryTab('fixcost')">✅ ประจำ</button>
+        <button class="tab-btn" data-stab="goals" onclick="switchSalaryTab('goals')">🏦 เป้าหมาย</button>
+      </div>
+
+      <!-- Sub-tab: Fix cost -->
+      <div id="stab-fixcost" class="tab-content">
+        <div class="section-title" style="margin-bottom:8px">💸 จ่ายทุกเดือน</div>
+        <div id="fixcost-container"></div>
+        <button onclick="openAddFixcostItem()" class="btn-secondary" style="margin-bottom:16px">+ เพิ่มรายการรายเดือน</button>
+        <div class="section-title" style="margin-bottom:8px">📅 เก็บสำหรับรายปี</div>
+        <div id="annual-container"></div>
+        <button onclick="openAnnualModal()" class="btn-secondary" style="margin-bottom:12px">+ เพิ่มรายการรายปี</button>
+      </div>
+
+      <!-- Sub-tab: Goals -->
+      <div id="stab-goals" class="tab-content" style="display:none">
+        <div id="goals-container"></div>
+        <button onclick="openGoalModal()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มเป้าหมาย</button>
       </div>
     </div>
 
@@ -295,6 +332,10 @@
     <button data-page="charts">
       <span class="nav-icon">📊</span>
       <span class="nav-label">รายงาน</span>
+    </button>
+    <button data-page="salary">
+      <span class="nav-icon">💰</span>
+      <span class="nav-label">เงินเดือน</span>
     </button>
   </nav>
 

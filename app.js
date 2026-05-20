@@ -1,6 +1,6 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 const CHANGELOG = [
   { v: '3.0', date: '20 พ.ค. 68', note: '✅ ประจำ: แยก section รายเดือน/รายปี, ติ๊กเก็บเงินทุกเดือน, กดจ่ายแล้วสร้างรายจ่ายอัตโนมัติ' },
   { v: '2.9', date: '20 พ.ค. 68', note: '🏦 เป้าหมาย: เพิ่ม deadline เดือน/ปี + คำนวณเฉลี่ยเก็บต่อเดือนอัตโนมัติ' },
@@ -78,6 +78,7 @@ function applyDefaults(data) {
   if (data.darkMode === undefined) data.darkMode      = false;
   if (!data.recurringItems)       data.recurringItems = [];
   if (!data.appName)              data.appName        = 'บัญชีส่วนตัว';
+  if (!data.salaryData)           data.salaryData     = {};
 }
 
 function getData() {
@@ -215,6 +216,7 @@ function reRenderPage() {
   if (p === 'dashboard') renderDashboard();
   else if (p === 'list') renderList();
   else if (p === 'charts') renderReports();
+  else if (p === 'salary') renderSalaryPage();
   else if (p === 'settings') renderSettings();
 }
 
@@ -421,6 +423,9 @@ const state = {
   editingGoalId: null,
   editingFuelId: null,
   _editingAnnualId: null,
+  salaryTab:   'fixcost',
+  salaryMonth: new Date().getMonth(),
+  salaryYear:  new Date().getFullYear(),
 };
 
 // ===== FORMAT HELPERS =====
@@ -445,7 +450,7 @@ function todayStr() {
 
 // ===== NAVIGATION =====
 
-const PAGE_ORDER = ['dashboard', 'add', 'list', 'charts'];
+const PAGE_ORDER = ['dashboard', 'add', 'list', 'charts', 'salary'];
 
 function navigate(page, dir) {
   if (!dir && state.page !== page) {
@@ -461,7 +466,7 @@ function navigate(page, dir) {
   document.querySelectorAll('#bottom-nav button').forEach(b => {
     b.classList.toggle('active', b.dataset.page === page);
   });
-  const isMain = ['dashboard','add','list','charts'].includes(page);
+  const isMain = ['dashboard','add','list','charts','salary'].includes(page);
   const titleEl = document.getElementById('page-title');
   if (isMain) {
     titleEl.textContent = getData().appName || 'บัญชีส่วนตัว';
@@ -479,6 +484,7 @@ function navigate(page, dir) {
   if (page === 'add' && !state.editingId) resetForm();
   if (page === 'list')     renderList();
   if (page === 'charts')   renderReports();
+  if (page === 'salary')   renderSalaryPage();
   if (page === 'settings') renderSettings();
 }
 
@@ -814,16 +820,107 @@ function renderReports() {
 
 function switchReportsTab(tab) {
   state.reportsTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['charts','budget','install','fixcost','goals','fuel'].forEach(id => {
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['charts','budget','install','fuel'].forEach(id => {
     document.getElementById(`tab-${id}`).style.display = id === tab ? 'block' : 'none';
   });
   if (tab === 'charts')  { requestAnimationFrame(() => { renderBarChart(); renderDailyChart(); renderPieChart(); }); }
   if (tab === 'budget')  renderBudget();
   if (tab === 'install') renderInstalls();
+  if (tab === 'fuel')    renderFuelTab();
+}
+
+// ===== SALARY PLANNER =====
+
+function _calcAllocation() {
+  const data = getData();
+  const fixedMonthly = (data.fixcostItems || []).reduce((s, i) => s + (i.amount || 0), 0);
+  const annualMonthly = (data.annualCosts || []).reduce((s, item) => {
+    const remaining = Math.max(0, item.yearlyAmount - (item.savedAmount || 0));
+    const mLeft = _monthsUntilPay(item.payMonth);
+    return s + ((remaining > 0 && mLeft > 0) ? Math.ceil(remaining / mLeft) : 0);
+  }, 0);
+  const goalsMonthly = (data.savingsGoals || []).reduce((s, goal) => {
+    const mLeft = _goalMonthsLeft(goal.deadlineMonth, goal.deadlineYear);
+    const remaining = Math.max(0, (goal.targetAmount || 0) - (goal.savedAmount || 0));
+    return s + ((mLeft && remaining > 0) ? Math.ceil(remaining / mLeft) : 0);
+  }, 0);
+  return { fixedMonthly, annualMonthly, goalsMonthly };
+}
+
+function _renderSalaryAllocation(entry) {
+  const salary    = entry.salary    || 0;
+  const allowance = entry.allowance || 0;
+  const bonus     = entry.bonus     || 0;
+  const total     = salary + allowance + bonus;
+  const summaryEl = document.getElementById('salary-summary');
+  const allocEl   = document.getElementById('salary-allocation');
+  const allocCard = document.getElementById('salary-allocation-card');
+
+  if (!total) { summaryEl.innerHTML = ''; allocCard.style.display = 'none'; return; }
+
+  let html = '';
+  if (salary)    html += `<span style="font-size:12px;color:#9E9E9E;margin-right:8px">เงินเดือน ฿${salary.toLocaleString()}</span>`;
+  if (allowance) html += `<span style="font-size:12px;color:#9E9E9E;margin-right:8px">เบี้ยเลี้ยง ฿${allowance.toLocaleString()}</span>`;
+  if (bonus)     html += `<span style="font-size:12px;color:#9E9E9E">โบนัส ฿${bonus.toLocaleString()}</span>`;
+  html += `<div style="font-size:20px;font-weight:800;color:var(--primary);margin-top:4px">รวม ฿${total.toLocaleString()}</div>`;
+  summaryEl.innerHTML = html;
+
+  const { fixedMonthly, annualMonthly, goalsMonthly } = _calcAllocation();
+  const totalAlloc = fixedMonthly + annualMonthly + goalsMonthly;
+  const leftover   = total - totalAlloc;
+
+  const row = (icon, label, amount) => {
+    const pct = total > 0 ? Math.round(amount / total * 100) : 0;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px">${icon} ${label} <span style="font-size:11px;color:#9E9E9E">${pct}%</span></span>
+      <span style="font-weight:700">฿${amount.toLocaleString()}</span>
+    </div>`;
+  };
+  allocEl.innerHTML =
+    row('💸', 'ประจำรายเดือน', fixedMonthly) +
+    row('📅', 'เก็บรายปี', annualMonthly) +
+    row('🎯', 'เป้าหมาย', goalsMonthly) +
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 2px;margin-top:4px">
+      <span style="font-size:15px;font-weight:700">${leftover >= 0 ? '🟢' : '🔴'} เหลือใช้จ่ายได้</span>
+      <span style="font-size:20px;font-weight:800;color:${leftover >= 0 ? '#2ecc71' : '#e74c3c'}">฿${leftover.toLocaleString()}</span>
+    </div>`;
+  allocCard.style.display = 'block';
+}
+
+function renderSalaryPage() {
+  document.getElementById('salary-month-label').textContent = monthLabel(state.salaryMonth, state.salaryYear);
+  const key   = `${state.salaryYear}-${String(state.salaryMonth + 1).padStart(2,'0')}`;
+  const entry = (getData().salaryData || {})[key] || {};
+  document.getElementById('salary-base').value  = entry.salary    || '';
+  document.getElementById('salary-allow').value = entry.allowance || '';
+  document.getElementById('salary-bonus').value = entry.bonus     || '';
+  _renderSalaryAllocation(entry);
+  switchSalaryTab(state.salaryTab || 'fixcost');
+}
+
+function saveSalaryEntry() {
+  const salary    = parseFloat(document.getElementById('salary-base').value.replace(/,/g,''))  || 0;
+  const allowance = parseFloat(document.getElementById('salary-allow').value.replace(/,/g,'')) || 0;
+  const bonus     = parseFloat(document.getElementById('salary-bonus').value.replace(/,/g,'')) || 0;
+  const key  = `${state.salaryYear}-${String(state.salaryMonth + 1).padStart(2,'0')}`;
+  const data = getData();
+  if (!data.salaryData) data.salaryData = {};
+  data.salaryData[key] = { salary, allowance, bonus };
+  saveData(data);
+  _renderSalaryAllocation({ salary, allowance, bonus });
+  showToast('บันทึกรายได้แล้ว ✅');
+}
+
+function switchSalaryTab(tab) {
+  state.salaryTab = tab;
+  document.querySelectorAll('[data-stab]').forEach(b => b.classList.toggle('active', b.dataset.stab === tab));
+  ['fixcost', 'goals'].forEach(id => {
+    const el = document.getElementById(`stab-${id}`);
+    if (el) el.style.display = id === tab ? 'block' : 'none';
+  });
   if (tab === 'fixcost') { renderFixcostChecklist(); renderAnnualSection(); }
   if (tab === 'goals')   renderGoalsTab();
-  if (tab === 'fuel')    renderFuelTab();
 }
 
 // ---- Charts ----
@@ -1481,9 +1578,11 @@ function applyRecurring(id) {
 
 // ===== FIX COST CHECKLIST =====
 
-function renderFixcostChecklist() {
+function renderFixcostChecklist(month, year) {
+  const m = month !== undefined ? month : state.salaryMonth;
+  const y = year  !== undefined ? year  : state.salaryYear;
   const { fixcostItems, fixcostChecks } = getData();
-  const monthKey = `${state.chartYear}-${String(state.chartMonth + 1).padStart(2,'0')}`;
+  const monthKey = `${y}-${String(m + 1).padStart(2,'0')}`;
   const checks   = fixcostChecks[monthKey] || {};
   const container = document.getElementById('fixcost-container');
 
@@ -1525,7 +1624,7 @@ function _afterFixcostRender() { renderAnnualSection(); }
 
 function toggleFixcostCheck(id) {
   const data = getData();
-  const monthKey = `${state.chartYear}-${String(state.chartMonth + 1).padStart(2,'0')}`;
+  const monthKey = `${state.salaryYear}-${String(state.salaryMonth + 1).padStart(2,'0')}`;
   if (!data.fixcostChecks[monthKey]) data.fixcostChecks[monthKey] = {};
   data.fixcostChecks[monthKey][id] = !data.fixcostChecks[monthKey][id];
   saveData(data);
@@ -2108,6 +2207,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.chartMonth++; if (state.chartMonth > 11) { state.chartMonth = 0; state.chartYear++; } renderReports();
   });
 
+  // Salary month nav
+  document.getElementById('salary-prev').addEventListener('click', () => {
+    state.salaryMonth--; if (state.salaryMonth < 0) { state.salaryMonth = 11; state.salaryYear--; } renderSalaryPage();
+  });
+  document.getElementById('salary-next').addEventListener('click', () => {
+    state.salaryMonth++; if (state.salaryMonth > 11) { state.salaryMonth = 0; state.salaryYear++; } renderSalaryPage();
+  });
+
   // Type toggle
   document.getElementById('toggle-expense').addEventListener('click', () => {
     state.addType = 'expense'; state.addCat = null; updateToggle(); updateCatGrid();
@@ -2164,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Swipe navigation
   const mainEl = document.getElementById('main');
-  const swipePages = ['dashboard', 'add', 'list', 'charts'];
+  const swipePages = ['dashboard', 'add', 'list', 'charts', 'salary'];
   let _swipeX = 0;
   mainEl.addEventListener('touchstart', e => { _swipeX = e.touches[0].clientX; }, { passive: true });
   mainEl.addEventListener('touchend', e => {

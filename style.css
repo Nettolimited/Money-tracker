@@ -305,6 +305,8 @@ body {
   box-sizing: border-box;
 }
 .tab-btn.active { background: var(--primary); color: white; }
+.tab-bar.tab-bar-2 { grid-template-columns: repeat(2, 1fr) !important; }
+.tab-bar.tab-bar-4 { grid-template-columns: repeat(4, 1fr) !important; }
 
 /* ---- BUDGET ---- */
 .budget-item {
