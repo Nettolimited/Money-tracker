@@ -723,8 +723,8 @@
       <input type="date" id="fuel-date" class="form-input">
     </div>
     <div class="form-group">
-      <label class="form-label">เลขไมล์ปัจจุบัน (กม.)</label>
-      <input type="number" id="fuel-odometer" class="form-input" placeholder="เช่น 84200">
+      <label class="form-label">ระยะที่วิ่งได้ต่อถัง (กม.)</label>
+      <input type="number" id="fuel-odometer" class="form-input" placeholder="เช่น 450">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-group">
@@ -739,12 +739,12 @@
     <div class="form-group">
       <label class="form-label">ประเภทน้ำมัน</label>
       <select id="fuel-type" class="form-input">
-        <option value="B7">B7</option>
-        <option value="B10">B10</option>
+        <option value="95">95</option>
+        <option value="91">91</option>
         <option value="E20">E20</option>
         <option value="E85">E85</option>
-        <option value="91">91</option>
-        <option value="95">95</option>
+        <option value="B7">B7</option>
+        <option value="B10">B10</option>
       </select>
     </div>
     <div class="form-group">
@@ -753,7 +753,18 @@
     </div>
     <div class="form-group">
       <label class="form-label">ปั้ม (ไม่บังคับ)</label>
-      <input type="text" id="fuel-station" class="form-input" placeholder="เช่น PT, ปตท., เชลล์">
+      <select id="fuel-station-select" class="form-input" onchange="onFuelStationChange(this.value)">
+        <option value="">-- เลือกปั้ม --</option>
+        <option value="ปตท.">ปตท. (PTT)</option>
+        <option value="เชลล์">เชลล์ (Shell)</option>
+        <option value="PT">PT</option>
+        <option value="บางจาก">บางจาก (Bangchak)</option>
+        <option value="เอสโซ่">เอสโซ่ (Esso)</option>
+        <option value="คาลเท็กซ์">คาลเท็กซ์ (Caltex)</option>
+        <option value="ซัสโก้">ซัสโก้ (Susco)</option>
+        <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
+      </select>
+      <input type="text" id="fuel-station" class="form-input" placeholder="ชื่อปั้ม" style="display:none;margin-top:6px">
     </div>
     <button onclick="saveFuel()" class="btn-primary">บันทึก</button>
     <button id="delete-fuel-btn" onclick="deleteFuel()" class="btn-danger" style="display:none;margin-top:8px">ลบรายการนี้</button>

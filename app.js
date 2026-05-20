@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 const CHANGELOG = [
+  { v: '2.8', date: '20 พ.ค. 68', note: '⛽ น้ำมัน: กรอกระยะต่อถัง, default 95, ปั้ม dropdown พร้อมเพิ่มเองได้' },
   { v: '2.7', date: '20 พ.ค. 68', note: 'Tab bar 2 แถว + ⛽ น้ำมันเชื่อมรายจ่าย BRV อัตโนมัติ' },
   { v: '2.6', date: '20 พ.ค. 68', note: 'เพิ่มแท็บ ⛽ น้ำมัน — บันทึกการเติม, คำนวณ กม./ลิตร และ บาท/กม. อัตโนมัติ' },
   { v: '2.5', date: '20 พ.ค. 68', note: 'เพิ่มแท็บ 🏦 เป้าหมายการเก็บเงิน — ตั้งเป้า, ติดตามยอด, Progress bar' },
@@ -1655,10 +1656,18 @@ function deleteGoal() {
 
 // ===== FUEL LOG =====
 
+const FUEL_STATIONS = ['ปตท.','เชลล์','PT','บางจาก','เอสโซ่','คาลเท็กซ์','ซัสโก้'];
+
+function onFuelStationChange(val) {
+  const txt = document.getElementById('fuel-station');
+  if (val === 'อื่นๆ') { txt.style.display = 'block'; txt.value = ''; txt.focus(); }
+  else { txt.style.display = 'none'; txt.value = val; }
+}
+
 function renderFuelTab() {
   const logs = (getData().fuelLogs || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-  const container  = document.getElementById('fuel-container');
-  const summaryEl  = document.getElementById('fuel-summary');
+  const container = document.getElementById('fuel-container');
+  const summaryEl = document.getElementById('fuel-summary');
 
   if (!logs.length) {
     summaryEl.style.display = 'none';
@@ -1672,17 +1681,14 @@ function renderFuelTab() {
     return;
   }
 
-  // Summary card (ใช้ข้อมูล 3 รายการล่าสุดที่มี odometer ครบ)
-  const withKm = logs.filter((l, i) => i < logs.length - 1); // ยกเว้นรายการเก่าสุด (ไม่รู้ต้นทาง)
-  if (withKm.length) {
-    const sorted = logs.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
-    let totalKm = 0, totalLiters = 0, totalCost = 0, count = 0;
-    for (let i = 1; i < sorted.length; i++) {
-      const km = sorted[i].odometer - sorted[i-1].odometer;
-      if (km > 0) { totalKm += km; totalLiters += sorted[i].liters; totalCost += sorted[i].cost; count++; }
-    }
-    const avgKmL  = count ? (totalKm / totalLiters).toFixed(1) : '-';
-    const avgBaht = count ? (totalCost / totalKm).toFixed(2) : '-';
+  // Summary — คำนวณจาก distanceKm (ระยะต่อถัง) โดยตรง
+  const withDist = logs.filter(l => l.distanceKm > 0 && l.liters > 0);
+  if (withDist.length) {
+    const totalKm     = withDist.reduce((s, l) => s + l.distanceKm, 0);
+    const totalLiters = withDist.reduce((s, l) => s + l.liters, 0);
+    const totalCost   = withDist.reduce((s, l) => s + l.cost, 0);
+    const avgKmL  = (totalKm / totalLiters).toFixed(1);
+    const avgBaht = (totalCost / totalKm).toFixed(2);
     summaryEl.style.display = 'block';
     summaryEl.innerHTML = `
       <div class="section-title" style="margin-bottom:10px">📊 สรุปภาพรวม</div>
@@ -1695,13 +1701,8 @@ function renderFuelTab() {
     summaryEl.style.display = 'none';
   }
 
-  // Render รายการ
-  const sorted = logs.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
-  container.innerHTML = logs.map((log, idx) => {
-    // หา km ที่วิ่งได้ (เทียบกับรายการก่อนหน้า)
-    const sortedIdx = sorted.findIndex(l => l.id === log.id);
-    const prev = sorted[sortedIdx - 1];
-    const km = prev ? log.odometer - prev.odometer : null;
+  container.innerHTML = logs.map(log => {
+    const km  = log.distanceKm || log.odometer || null; // backward compat
     const kmL = (km && km > 0 && log.liters) ? (km / log.liters).toFixed(1) : null;
     const dateStr = log.date ? new Date(log.date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '';
     return `
@@ -1710,7 +1711,7 @@ function renderFuelTab() {
         <div>
           <div style="font-size:13px;color:#9E9E9E">${dateStr}${log.station ? ' · ' + log.station : ''}</div>
           <div style="font-size:15px;font-weight:700;margin-top:2px">${log.fuelType} · ${log.liters} ลิตร</div>
-          <div style="font-size:13px;color:#9E9E9E;margin-top:2px">ไมล์ ${log.odometer.toLocaleString()} กม.${km && km > 0 ? ' · วิ่ง ' + km.toLocaleString() + ' กม.' : ''}</div>
+          ${km ? `<div style="font-size:13px;color:#9E9E9E;margin-top:2px">วิ่ง ${km.toLocaleString()} กม.</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:15px;font-weight:800;color:#FF1744">฿${log.cost.toLocaleString()}</div>
@@ -1719,6 +1720,14 @@ function renderFuelTab() {
       </div>
     </div>`;
   }).join('');
+}
+
+function _setFuelStationUI(station) {
+  const sel = document.getElementById('fuel-station-select');
+  const txt = document.getElementById('fuel-station');
+  if (!station) { sel.value = ''; txt.style.display = 'none'; txt.value = ''; return; }
+  if (FUEL_STATIONS.includes(station)) { sel.value = station; txt.style.display = 'none'; txt.value = station; }
+  else { sel.value = 'อื่นๆ'; txt.style.display = 'block'; txt.value = station; }
 }
 
 function openFuelModal(id) {
@@ -1732,40 +1741,41 @@ function openFuelModal(id) {
     const log = (getData().fuelLogs || []).find(l => l.id === id);
     if (!log) return;
     titleEl.textContent = '⛽ แก้ไขการเติมน้ำมัน';
-    document.getElementById('fuel-date').value      = log.date;
-    document.getElementById('fuel-odometer').value  = log.odometer;
-    document.getElementById('fuel-liters').value    = log.liters;
-    document.getElementById('fuel-cost').value      = log.cost;
-    document.getElementById('fuel-type').value      = log.fuelType;
+    document.getElementById('fuel-date').value     = log.date;
+    document.getElementById('fuel-odometer').value = log.distanceKm || log.odometer || '';
+    document.getElementById('fuel-liters').value   = log.liters;
+    document.getElementById('fuel-cost').value     = log.cost;
+    document.getElementById('fuel-type').value     = log.fuelType;
     accSel.value = log.account || (accounts && accounts[0]) || '';
-    document.getElementById('fuel-station').value   = log.station || '';
+    _setFuelStationUI(log.station || '');
     delBtn.style.display = 'block';
   } else {
     titleEl.textContent = '⛽ บันทึกการเติมน้ำมัน';
-    document.getElementById('fuel-date').value      = new Date().toISOString().slice(0, 10);
-    document.getElementById('fuel-odometer').value  = '';
-    document.getElementById('fuel-liters').value    = '';
-    document.getElementById('fuel-cost').value      = '';
-    document.getElementById('fuel-type').value      = 'B7';
+    document.getElementById('fuel-date').value     = new Date().toISOString().slice(0, 10);
+    document.getElementById('fuel-odometer').value = '';
+    document.getElementById('fuel-liters').value   = '';
+    document.getElementById('fuel-cost').value     = '';
+    document.getElementById('fuel-type').value     = '95';
     accSel.value = accounts && accounts[0] ? accounts[0] : '';
-    document.getElementById('fuel-station').value   = '';
+    _setFuelStationUI('');
     delBtn.style.display = 'none';
   }
   openModal('modal-fuel');
 }
 
 function saveFuel() {
-  const date      = document.getElementById('fuel-date').value;
-  const odometer  = parseFloat(document.getElementById('fuel-odometer').value);
-  const liters    = parseFloat(document.getElementById('fuel-liters').value);
-  const cost      = parseFloat(document.getElementById('fuel-cost').value);
-  const fuelType  = document.getElementById('fuel-type').value;
-  const account   = document.getElementById('fuel-account').value;
-  const station   = document.getElementById('fuel-station').value.trim();
-  if (!date)                      { alert('กรุณาเลือกวันที่'); return; }
-  if (!odometer || odometer <= 0) { alert('กรุณากรอกเลขไมล์'); return; }
-  if (!liters || liters <= 0)     { alert('กรุณากรอกจำนวนลิตร'); return; }
-  if (!cost || cost <= 0)         { alert('กรุณากรอกราคารวม'); return; }
+  const date        = document.getElementById('fuel-date').value;
+  const distanceKm  = parseFloat(document.getElementById('fuel-odometer').value) || 0;
+  const liters      = parseFloat(document.getElementById('fuel-liters').value);
+  const cost        = parseFloat(document.getElementById('fuel-cost').value);
+  const fuelType    = document.getElementById('fuel-type').value;
+  const account     = document.getElementById('fuel-account').value;
+  const stationSel  = document.getElementById('fuel-station-select').value;
+  const stationTxt  = document.getElementById('fuel-station').value.trim();
+  const station     = stationSel === 'อื่นๆ' ? stationTxt : (stationSel || '');
+  if (!date)                  { alert('กรุณาเลือกวันที่'); return; }
+  if (!liters || liters <= 0) { alert('กรุณากรอกจำนวนลิตร'); return; }
+  if (!cost || cost <= 0)     { alert('กรุณากรอกราคารวม'); return; }
 
   const data = getData();
   if (!data.fuelLogs) data.fuelLogs = [];
@@ -1777,8 +1787,7 @@ function saveFuel() {
     const idx = data.fuelLogs.findIndex(l => l.id === state.editingFuelId);
     if (idx !== -1) {
       const old = data.fuelLogs[idx];
-      data.fuelLogs[idx] = { ...old, date, odometer, liters, cost, fuelType, account, station };
-      // อัพเดท transaction ที่เชื่อมอยู่
+      data.fuelLogs[idx] = { ...old, date, distanceKm, liters, cost, fuelType, account, station };
       if (old.txId) {
         const tIdx = data.transactions.findIndex(t => t.id === old.txId);
         if (tIdx !== -1) data.transactions[tIdx] = { ...data.transactions[tIdx], date, amount: cost, account, note: txNote };
@@ -1787,7 +1796,7 @@ function saveFuel() {
   } else {
     const txId = genId();
     data.transactions.push({ id: txId, type: 'expense', category: 'BRV', amount: cost, account, date, note: txNote, createdAt: Date.now() });
-    data.fuelLogs.push({ id: genId(), date, odometer, liters, cost, fuelType, account, station, txId });
+    data.fuelLogs.push({ id: genId(), date, distanceKm, liters, cost, fuelType, account, station, txId });
   }
 
   saveData(data);
