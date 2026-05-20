@@ -1566,7 +1566,13 @@ function renderGoalsTab() {
   const goals = getData().savingsGoals || [];
   const container = document.getElementById('goals-container');
   if (!goals.length) {
-    container.innerHTML = '<div style="text-align:center;padding:32px 16px;color:#9E9E9E;font-size:14px">ยังไม่มีเป้าหมาย<br>กด "+ เพิ่มเป้าหมาย" เพื่อเริ่มต้น</div>';
+    container.innerHTML = `
+      <div style="text-align:center;padding:48px 24px 32px;display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="font-size:52px">🏦</div>
+        <div style="font-size:16px;font-weight:700;color:#212121">ยังไม่มีเป้าหมาย</div>
+        <div style="font-size:13px;color:#9E9E9E;line-height:1.6">ตั้งเป้าหมายการเก็บเงิน<br>ติดตาม progress ได้ในหน้านี้</div>
+        <button onclick="openGoalModal()" class="btn-primary" style="margin-top:8px;padding:14px 32px;font-size:15px">+ เพิ่มเป้าหมายแรก</button>
+      </div>`;
     return;
   }
   container.innerHTML = goals.map(g => {
