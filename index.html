@@ -368,11 +368,13 @@
     <select id="asset-type" class="form-input" onchange="_onAssetTypeChange()">
       <option value="property">🏠 บ้าน / คอนโด</option>
       <option value="vehicle">🚗 รถ / มอเตอร์ไซค์</option>
-      <option value="financial">💵 เงินฝาก / กองทุน / หุ้น</option>
+      <option value="financial">💵 กองทุนรวม (SEC)</option>
+      <option value="stock">📈 หุ้น US / ETF</option>
+      <option value="gold">🥇 ทองคำ</option>
       <option value="other">📦 ของมีค่า / อื่นๆ</option>
     </select>
 
-    <!-- fields: ราคาตรง (non-financial) -->
+    <!-- fields: ราคาตรง (property/vehicle/other) -->
     <div id="asset-direct-fields">
       <label class="form-label" style="margin-top:10px">มูลค่าปัจจุบัน (บาท)</label>
       <input type="text" inputmode="decimal" id="asset-value" class="form-input" placeholder="0">
@@ -380,7 +382,7 @@
       <input type="text" inputmode="decimal" id="asset-purchase" class="form-input" placeholder="0">
     </div>
 
-    <!-- fields: หน่วยลงทุน × NAV (financial only) -->
+    <!-- fields: กองทุนรวม SEC -->
     <div id="asset-fund-fields" style="display:none">
       <label class="form-label" style="margin-top:10px">SEC Proj ID <span style="font-weight:400;color:#9E9E9E">(เช่น M0643_2555)</span></label>
       <div style="display:flex;gap:8px;align-items:center">
@@ -397,7 +399,39 @@
       <input type="text" inputmode="decimal" id="asset-cost" class="form-input" placeholder="0">
     </div>
 
-    <label class="form-label" style="margin-top:10px">หมายเหตุ / ชื่อกองทุน</label>
+    <!-- fields: หุ้น US -->
+    <div id="asset-stock-fields" style="display:none">
+      <label class="form-label" style="margin-top:10px">Ticker Symbol</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="asset-ticker" class="form-input" placeholder="เช่น AAPL, TSLA, NVDA" style="flex:1;text-transform:uppercase">
+        <button onclick="_fetchStockPrice()" class="btn-secondary" style="white-space:nowrap;padding:10px 12px">🔄 ราคา</button>
+      </div>
+      <div id="asset-stock-status" style="font-size:12px;color:#9E9E9E;margin-top:4px"></div>
+      <label class="form-label" style="margin-top:10px">จำนวนหุ้น (shares)</label>
+      <input type="text" inputmode="decimal" id="asset-shares" class="form-input" placeholder="0.0000" oninput="_calcStockValue()">
+      <label class="form-label" style="margin-top:10px">ราคา/หุ้น (USD)</label>
+      <input type="text" inputmode="decimal" id="asset-price-usd" class="form-input" placeholder="0.00" oninput="_calcStockValue()">
+      <div id="asset-stock-calc" style="text-align:right;margin-top:6px;font-size:13px;color:var(--primary);font-weight:700;display:none"></div>
+      <label class="form-label" style="margin-top:10px">ต้นทุนรวม (บาท) — ไม่บังคับ</label>
+      <input type="text" inputmode="decimal" id="asset-stock-cost" class="form-input" placeholder="0">
+    </div>
+
+    <!-- fields: ทองคำ -->
+    <div id="asset-gold-fields" style="display:none">
+      <label class="form-label" style="margin-top:10px">จำนวน (กรัม)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" inputmode="decimal" id="asset-grams" class="form-input" placeholder="0.00" style="flex:1" oninput="_calcGoldValue()">
+        <button onclick="_fetchGoldPrice()" class="btn-secondary" style="white-space:nowrap;padding:10px 12px">🔄 ราคาทอง</button>
+      </div>
+      <div id="asset-gold-status" style="font-size:12px;color:#9E9E9E;margin-top:4px"></div>
+      <label class="form-label" style="margin-top:10px">ราคาทอง (บาท/กรัม)</label>
+      <input type="text" inputmode="decimal" id="asset-gold-price" class="form-input" placeholder="0.00" oninput="_calcGoldValue()">
+      <div id="asset-gold-calc" style="text-align:right;margin-top:6px;font-size:13px;color:var(--primary);font-weight:700;display:none"></div>
+      <label class="form-label" style="margin-top:10px">ต้นทุนรวม (บาท) — ไม่บังคับ</label>
+      <input type="text" inputmode="decimal" id="asset-gold-cost" class="form-input" placeholder="0">
+    </div>
+
+    <label class="form-label" style="margin-top:10px">หมายเหตุ</label>
     <input type="text" id="asset-note" class="form-input" placeholder="ไม่บังคับ">
     <button onclick="saveAsset()" class="btn-primary" style="margin-top:14px">บันทึก</button>
     <button id="delete-asset-btn" onclick="deleteAsset()" class="btn-danger" style="display:none;margin-top:8px">ลบสินทรัพย์นี้</button>
