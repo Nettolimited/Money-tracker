@@ -362,17 +362,33 @@
     <label class="form-label">ชื่อสินทรัพย์</label>
     <input type="text" id="asset-name" class="form-input" placeholder="เช่น บ้านหมู่บ้านสุขใจ, Toyota Yaris">
     <label class="form-label" style="margin-top:10px">ประเภท</label>
-    <select id="asset-type" class="form-input">
+    <select id="asset-type" class="form-input" onchange="_onAssetTypeChange()">
       <option value="property">🏠 บ้าน / คอนโด</option>
       <option value="vehicle">🚗 รถ / มอเตอร์ไซค์</option>
       <option value="financial">💵 เงินฝาก / กองทุน / หุ้น</option>
       <option value="other">📦 ของมีค่า / อื่นๆ</option>
     </select>
-    <label class="form-label" style="margin-top:10px">มูลค่าปัจจุบัน (บาท)</label>
-    <input type="text" inputmode="decimal" id="asset-value" class="form-input" placeholder="0">
-    <label class="form-label" style="margin-top:10px">ราคาที่ซื้อมา (บาท) — ไม่บังคับ</label>
-    <input type="text" inputmode="decimal" id="asset-purchase" class="form-input" placeholder="0">
-    <label class="form-label" style="margin-top:10px">หมายเหตุ</label>
+
+    <!-- fields: ราคาตรง (non-financial) -->
+    <div id="asset-direct-fields">
+      <label class="form-label" style="margin-top:10px">มูลค่าปัจจุบัน (บาท)</label>
+      <input type="text" inputmode="decimal" id="asset-value" class="form-input" placeholder="0">
+      <label class="form-label" style="margin-top:10px">ราคาที่ซื้อมา (บาท) — ไม่บังคับ</label>
+      <input type="text" inputmode="decimal" id="asset-purchase" class="form-input" placeholder="0">
+    </div>
+
+    <!-- fields: หน่วยลงทุน × NAV (financial only) -->
+    <div id="asset-fund-fields" style="display:none">
+      <label class="form-label" style="margin-top:10px">จำนวนหน่วยลงทุน</label>
+      <input type="text" inputmode="decimal" id="asset-units" class="form-input" placeholder="0.0000" oninput="_calcFundValue()">
+      <label class="form-label" style="margin-top:10px">NAV ล่าสุด (บาท/หน่วย)</label>
+      <input type="text" inputmode="decimal" id="asset-nav" class="form-input" placeholder="0.00" oninput="_calcFundValue()">
+      <div id="asset-fund-calc" style="text-align:right;margin-top:6px;font-size:13px;color:var(--primary);font-weight:700;display:none"></div>
+      <label class="form-label" style="margin-top:10px">ต้นทุนรวม (บาท) — ไม่บังคับ</label>
+      <input type="text" inputmode="decimal" id="asset-cost" class="form-input" placeholder="0">
+    </div>
+
+    <label class="form-label" style="margin-top:10px">หมายเหตุ / ชื่อกองทุน</label>
     <input type="text" id="asset-note" class="form-input" placeholder="ไม่บังคับ">
     <button onclick="saveAsset()" class="btn-primary" style="margin-top:14px">บันทึก</button>
     <button id="delete-asset-btn" onclick="deleteAsset()" class="btn-danger" style="display:none;margin-top:8px">ลบสินทรัพย์นี้</button>

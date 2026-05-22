@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.8';
+const APP_VERSION = '3.9';
 const CHANGELOG = [
+  { v: '3.9', date: '23 พ.ค. 68', note: '💵 กองทุน: คำนวณมูลค่าจาก หน่วยลงทุน × NAV อัพเดท NAV ได้ตลอด' },
   { v: '3.8', date: '22 พ.ค. 68', note: '🏦 หน้าสินทรัพย์ใหม่: บ้าน/รถ/กองทุน/ของมีค่า + Net Worth (สินทรัพย์ − หนี้ผ่อน)' },
   { v: '3.7', date: '22 พ.ค. 68', note: '💳 ย้ายรายการผ่อนไปอยู่ในแท็บ ✅ ประจำ | แผนเงินเดือน: เรียงลำดับรายการได้ด้วยการลาก' },
   { v: '3.6', date: '20 พ.ค. 68', note: '💳 ผ่อน: ราคาเต็ม+ดอกเบี้ย คำนวณงวดอัตโนมัติ | แผนเงินเดือน: รวมยอดผ่อน, VAT% ในรายการ, กดแถวเพื่อแก้ไข' },
@@ -1574,20 +1575,41 @@ function renderAssetsPage() {
       const gainHtml = gain !== null
         ? `<span style="font-size:11px;color:${gain >= 0 ? '#2ecc71' : '#e74c3c'}">${gain >= 0 ? '▲' : '▼'} ฿${Math.abs(gain).toLocaleString()}</span>`
         : '';
+      const subHtml = a.type === 'financial' && a.units
+        ? `<span style="font-size:11px;color:#9E9E9E">${(a.units).toLocaleString()} หน่วย × ฿${(a.nav || 0).toLocaleString()}</span>`
+        : (a.note ? `<span style="font-size:12px;color:#9E9E9E">${a.note}</span>` : '');
       html += `<div onclick="openAssetModal('${a.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
         <div>
-          <div style="font-size:14px;font-weight:600">${a.name}</div>
-          <div style="display:flex;gap:8px;margin-top:2px">
-            ${a.note ? `<span style="font-size:12px;color:#9E9E9E">${a.note}</span>` : ''}
+          <div style="font-size:14px;font-weight:600">${a.name}${a.note && a.type === 'financial' ? ` <span style="font-size:11px;color:#9E9E9E;font-weight:400">${a.note}</span>` : ''}</div>
+          <div style="display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
+            ${subHtml}
             ${gainHtml}
           </div>
         </div>
-        <div style="font-weight:800;font-size:15px">฿${(a.currentValue || 0).toLocaleString()}</div>
+        <div style="font-weight:800;font-size:15px;text-align:right">฿${(a.currentValue || 0).toLocaleString()}</div>
       </div>`;
     });
     html += `</div>`;
   });
   container.innerHTML = html;
+}
+
+function _onAssetTypeChange() {
+  const isFund = document.getElementById('asset-type').value === 'financial';
+  document.getElementById('asset-direct-fields').style.display = isFund ? 'none' : 'block';
+  document.getElementById('asset-fund-fields').style.display   = isFund ? 'block' : 'none';
+}
+
+function _calcFundValue() {
+  const units = parseFloat(document.getElementById('asset-units').value.replace(/,/g,'')) || 0;
+  const nav   = parseFloat(document.getElementById('asset-nav').value.replace(/,/g,'')) || 0;
+  const calc  = document.getElementById('asset-fund-calc');
+  if (units > 0 && nav > 0) {
+    calc.textContent = `= ฿${(units * nav).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    calc.style.display = 'block';
+  } else {
+    calc.style.display = 'none';
+  }
 }
 
 function openAssetModal(id) {
@@ -1600,27 +1622,49 @@ function openAssetModal(id) {
     if (!asset) return;
     document.getElementById('asset-name').value     = asset.name;
     document.getElementById('asset-type').value     = asset.type || 'other';
-    document.getElementById('asset-value').value    = asset.currentValue || '';
-    document.getElementById('asset-purchase').value = asset.purchasePrice || '';
     document.getElementById('asset-note').value     = asset.note || '';
+    if (asset.type === 'financial') {
+      document.getElementById('asset-units').value  = asset.units || '';
+      document.getElementById('asset-nav').value    = asset.nav || '';
+      document.getElementById('asset-cost').value   = asset.purchasePrice || '';
+    } else {
+      document.getElementById('asset-value').value    = asset.currentValue || '';
+      document.getElementById('asset-purchase').value = asset.purchasePrice || '';
+    }
   } else {
     document.getElementById('asset-name').value     = '';
     document.getElementById('asset-type').value     = 'property';
     document.getElementById('asset-value').value    = '';
     document.getElementById('asset-purchase').value = '';
+    document.getElementById('asset-units').value    = '';
+    document.getElementById('asset-nav').value      = '';
+    document.getElementById('asset-cost').value     = '';
     document.getElementById('asset-note').value     = '';
+    document.getElementById('asset-fund-calc').style.display = 'none';
   }
+  _onAssetTypeChange();
   openModal('modal-asset');
 }
 
 function saveAsset() {
-  const name     = document.getElementById('asset-name').value.trim();
-  const type     = document.getElementById('asset-type').value;
-  const value    = parseFloat(document.getElementById('asset-value').value.replace(/,/g,'')) || 0;
-  const purchase = parseFloat(document.getElementById('asset-purchase').value.replace(/,/g,'')) || 0;
-  const note     = document.getElementById('asset-note').value.trim();
+  const name = document.getElementById('asset-name').value.trim();
+  const type = document.getElementById('asset-type').value;
+  const note = document.getElementById('asset-note').value.trim();
   if (!name) { alert('กรุณาใส่ชื่อสินทรัพย์'); return; }
-  const obj = { name, type, currentValue: value, purchasePrice: purchase, note };
+
+  let obj;
+  if (type === 'financial') {
+    const units = parseFloat(document.getElementById('asset-units').value.replace(/,/g,'')) || 0;
+    const nav   = parseFloat(document.getElementById('asset-nav').value.replace(/,/g,'')) || 0;
+    const cost  = parseFloat(document.getElementById('asset-cost').value.replace(/,/g,'')) || 0;
+    if (!units || !nav) { alert('กรุณาใส่จำนวนหน่วยและ NAV'); return; }
+    obj = { name, type, units, nav, currentValue: units * nav, purchasePrice: cost, note };
+  } else {
+    const value    = parseFloat(document.getElementById('asset-value').value.replace(/,/g,'')) || 0;
+    const purchase = parseFloat(document.getElementById('asset-purchase').value.replace(/,/g,'')) || 0;
+    obj = { name, type, currentValue: value, purchasePrice: purchase, note };
+  }
+
   const data = getData();
   if (!data.assets) data.assets = [];
   if (state._editingAssetId) {
