@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.7';
+const APP_VERSION = '3.8';
 const CHANGELOG = [
+  { v: '3.8', date: '22 พ.ค. 68', note: '🏦 หน้าสินทรัพย์ใหม่: บ้าน/รถ/กองทุน/ของมีค่า + Net Worth (สินทรัพย์ − หนี้ผ่อน)' },
   { v: '3.7', date: '22 พ.ค. 68', note: '💳 ย้ายรายการผ่อนไปอยู่ในแท็บ ✅ ประจำ | แผนเงินเดือน: เรียงลำดับรายการได้ด้วยการลาก' },
   { v: '3.6', date: '20 พ.ค. 68', note: '💳 ผ่อน: ราคาเต็ม+ดอกเบี้ย คำนวณงวดอัตโนมัติ | แผนเงินเดือน: รวมยอดผ่อน, VAT% ในรายการ, กดแถวเพื่อแก้ไข' },
   { v: '3.5', date: '20 พ.ค. 68', note: '💰 หน้าเงินเดือน: เพิ่มรายการเองได้ + กำหนดสัดส่วนเบี้ยเลี้ยง/โบนัสเอง' },
@@ -86,6 +87,7 @@ function applyDefaults(data) {
   if (!data.salaryConfig.customItems)     data.salaryConfig.customItems     = [];
   if (!data.salaryConfig.allowanceSplits) data.salaryConfig.allowanceSplits = [];
   if (!data.salaryConfig.bonusSplits)     data.salaryConfig.bonusSplits     = [];
+  if (!data.assets)                       data.assets                       = [];
 }
 
 function getData() {
@@ -465,7 +467,7 @@ function todayStr() {
 
 // ===== NAVIGATION =====
 
-const PAGE_ORDER = ['dashboard', 'add', 'list', 'charts', 'salary'];
+const PAGE_ORDER = ['dashboard', 'add', 'list', 'charts', 'salary', 'assets'];
 
 function navigate(page, dir) {
   if (!dir && state.page !== page) {
@@ -481,7 +483,7 @@ function navigate(page, dir) {
   document.querySelectorAll('#bottom-nav button').forEach(b => {
     b.classList.toggle('active', b.dataset.page === page);
   });
-  const isMain = ['dashboard','add','list','charts','salary'].includes(page);
+  const isMain = ['dashboard','add','list','charts','salary','assets'].includes(page);
   const titleEl = document.getElementById('page-title');
   if (isMain) {
     titleEl.textContent = getData().appName || 'บัญชีส่วนตัว';
@@ -500,6 +502,7 @@ function navigate(page, dir) {
   if (page === 'list')     renderList();
   if (page === 'charts')   renderReports();
   if (page === 'salary')   renderSalaryPage();
+  if (page === 'assets')   renderAssetsPage();
   if (page === 'settings') renderSettings();
 }
 
@@ -1509,6 +1512,135 @@ function deleteInstall() {
   state.editingInstallId = null;
   closeModal('modal-install');
   renderInstalls();
+}
+
+// ===== ASSETS =====
+
+const ASSET_TYPES = {
+  property:  { icon: '🏠', label: 'บ้าน / คอนโด' },
+  vehicle:   { icon: '🚗', label: 'รถ / มอเตอร์ไซค์' },
+  financial: { icon: '💵', label: 'เงินฝาก / กองทุน / หุ้น' },
+  other:     { icon: '📦', label: 'ของมีค่า / อื่นๆ' },
+};
+
+function renderAssetsPage() {
+  const data = getData();
+  const assets = data.assets || [];
+  const installments = data.installments || [];
+
+  const totalAssets = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
+  const totalDebt   = installments
+    .filter(i => i.paidMonths < i.totalMonths)
+    .reduce((s, i) => s + Math.max(0, i.totalMonths - i.paidMonths) * i.amountPerMonth, 0);
+  const netWorth = totalAssets - totalDebt;
+
+  document.getElementById('assets-net-worth').innerHTML = `
+    <div style="display:flex;justify-content:space-between;text-align:center">
+      <div style="flex:1">
+        <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">สินทรัพย์รวม</div>
+        <div style="font-size:15px;font-weight:800;color:#2ecc71">฿${totalAssets.toLocaleString()}</div>
+      </div>
+      <div style="flex:1;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+        <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">หนี้สิน</div>
+        <div style="font-size:15px;font-weight:800;color:#e74c3c">฿${totalDebt.toLocaleString()}</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">Net Worth</div>
+        <div style="font-size:15px;font-weight:800;color:${netWorth >= 0 ? '#6C63FF' : '#e74c3c'}">฿${netWorth.toLocaleString()}</div>
+      </div>
+    </div>`;
+
+  const container = document.getElementById('assets-container');
+  if (!assets.length) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">🏦</div><p>ยังไม่มีสินทรัพย์<br>กด "+ เพิ่มสินทรัพย์" ด้านล่าง</p></div>';
+    return;
+  }
+
+  const groups = {};
+  assets.forEach(a => { if (!groups[a.type]) groups[a.type] = []; groups[a.type].push(a); });
+
+  let html = '';
+  ['property','vehicle','financial','other'].forEach(type => {
+    if (!groups[type]) return;
+    const { icon, label } = ASSET_TYPES[type];
+    const groupTotal = groups[type].reduce((s, a) => s + (a.currentValue || 0), 0);
+    html += `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-title" style="margin:0">${icon} ${label}</div>
+        <span style="font-size:13px;font-weight:700;color:var(--primary)">฿${groupTotal.toLocaleString()}</span>
+      </div>`;
+    groups[type].forEach(a => {
+      const gain = a.purchasePrice ? a.currentValue - a.purchasePrice : null;
+      const gainHtml = gain !== null
+        ? `<span style="font-size:11px;color:${gain >= 0 ? '#2ecc71' : '#e74c3c'}">${gain >= 0 ? '▲' : '▼'} ฿${Math.abs(gain).toLocaleString()}</span>`
+        : '';
+      html += `<div onclick="openAssetModal('${a.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+        <div>
+          <div style="font-size:14px;font-weight:600">${a.name}</div>
+          <div style="display:flex;gap:8px;margin-top:2px">
+            ${a.note ? `<span style="font-size:12px;color:#9E9E9E">${a.note}</span>` : ''}
+            ${gainHtml}
+          </div>
+        </div>
+        <div style="font-weight:800;font-size:15px">฿${(a.currentValue || 0).toLocaleString()}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  container.innerHTML = html;
+}
+
+function openAssetModal(id) {
+  state._editingAssetId = id || null;
+  const isEdit = !!id;
+  document.getElementById('modal-asset-title').textContent = isEdit ? 'แก้ไขสินทรัพย์' : 'เพิ่มสินทรัพย์';
+  document.getElementById('delete-asset-btn').style.display = isEdit ? 'block' : 'none';
+  if (isEdit) {
+    const asset = (getData().assets || []).find(a => a.id === id);
+    if (!asset) return;
+    document.getElementById('asset-name').value     = asset.name;
+    document.getElementById('asset-type').value     = asset.type || 'other';
+    document.getElementById('asset-value').value    = asset.currentValue || '';
+    document.getElementById('asset-purchase').value = asset.purchasePrice || '';
+    document.getElementById('asset-note').value     = asset.note || '';
+  } else {
+    document.getElementById('asset-name').value     = '';
+    document.getElementById('asset-type').value     = 'property';
+    document.getElementById('asset-value').value    = '';
+    document.getElementById('asset-purchase').value = '';
+    document.getElementById('asset-note').value     = '';
+  }
+  openModal('modal-asset');
+}
+
+function saveAsset() {
+  const name     = document.getElementById('asset-name').value.trim();
+  const type     = document.getElementById('asset-type').value;
+  const value    = parseFloat(document.getElementById('asset-value').value.replace(/,/g,'')) || 0;
+  const purchase = parseFloat(document.getElementById('asset-purchase').value.replace(/,/g,'')) || 0;
+  const note     = document.getElementById('asset-note').value.trim();
+  if (!name) { alert('กรุณาใส่ชื่อสินทรัพย์'); return; }
+  const obj = { name, type, currentValue: value, purchasePrice: purchase, note };
+  const data = getData();
+  if (!data.assets) data.assets = [];
+  if (state._editingAssetId) {
+    const idx = data.assets.findIndex(a => a.id === state._editingAssetId);
+    if (idx !== -1) data.assets[idx] = { ...data.assets[idx], ...obj };
+  } else {
+    data.assets.push({ id: genId(), ...obj });
+  }
+  saveData(data);
+  closeModal('modal-asset');
+  renderAssetsPage();
+}
+
+function deleteAsset() {
+  if (!confirm('ลบสินทรัพย์นี้?')) return;
+  const data = getData();
+  data.assets = (data.assets || []).filter(a => a.id !== state._editingAssetId);
+  saveData(data);
+  closeModal('modal-asset');
+  renderAssetsPage();
 }
 
 // ===== SETTINGS =====
