@@ -1135,13 +1135,12 @@ function saveSalaryEntry() {
 function switchSalaryTab(tab) {
   state.salaryTab = tab;
   document.querySelectorAll('[data-stab]').forEach(b => b.classList.toggle('active', b.dataset.stab === tab));
-  ['fixcost', 'goals', 'install'].forEach(id => {
+  ['fixcost', 'goals'].forEach(id => {
     const el = document.getElementById(`stab-${id}`);
     if (el) el.style.display = id === tab ? 'block' : 'none';
   });
-  if (tab === 'fixcost') { renderFixcostChecklist(); renderAnnualSection(); }
+  if (tab === 'fixcost') { renderFixcostChecklist(); renderInstalls(); renderAnnualSection(); }
   if (tab === 'goals')   renderGoalsTab();
-  if (tab === 'install') renderInstalls();
 }
 
 // ---- Charts ----
