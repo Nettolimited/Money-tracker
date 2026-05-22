@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '3.9';
+const APP_VERSION = '4.0';
 const CHANGELOG = [
+  { v: '4.0', date: '23 พ.ค. 68', note: '🤖 ดึง NAV กองทุนอัตโนมัติจาก SEC Thailand API + ปุ่ม อัพ NAV ทั้งหมด' },
   { v: '3.9', date: '23 พ.ค. 68', note: '💵 กองทุน: คำนวณมูลค่าจาก หน่วยลงทุน × NAV อัพเดท NAV ได้ตลอด' },
   { v: '3.8', date: '22 พ.ค. 68', note: '🏦 หน้าสินทรัพย์ใหม่: บ้าน/รถ/กองทุน/ของมีค่า + Net Worth (สินทรัพย์ − หนี้ผ่อน)' },
   { v: '3.7', date: '22 พ.ค. 68', note: '💳 ย้ายรายการผ่อนไปอยู่ในแท็บ ✅ ประจำ | แผนเงินเดือน: เรียงลำดับรายการได้ด้วยการลาก' },
@@ -1594,6 +1595,52 @@ function renderAssetsPage() {
   container.innerHTML = html;
 }
 
+async function _fetchNavByProjId() {
+  const projId = document.getElementById('asset-proj-id').value.trim();
+  if (!projId) { alert('กรุณาใส่ SEC Proj ID ก่อน'); return; }
+  const statusEl = document.getElementById('asset-nav-status');
+  statusEl.textContent = '⏳ กำลังดึงข้อมูล...';
+  statusEl.style.color = '#9E9E9E';
+  try {
+    const res = await fetch(`/.netlify/functions/nav?proj_id=${encodeURIComponent(projId)}`);
+    const json = await res.json();
+    if (!res.ok || !json.nav) throw new Error(json.error || 'ไม่พบข้อมูล');
+    document.getElementById('asset-nav').value = json.nav;
+    _calcFundValue();
+    statusEl.textContent = `✅ NAV ${json.date}: ฿${json.nav} (${json.class_name || ''})`;
+    statusEl.style.color = '#2ecc71';
+  } catch (e) {
+    statusEl.textContent = `❌ ${e.message}`;
+    statusEl.style.color = '#e74c3c';
+  }
+}
+
+async function _autoRefreshAllFundNavs() {
+  const data = getData();
+  const funds = (data.assets || []).filter(a => a.type === 'financial' && a.projId && a.units);
+  if (!funds.length) { showToast('ไม่มีกองทุนที่มี Proj ID'); return; }
+  showToast('⏳ กำลังอัพเดท NAV...');
+  let updated = 0;
+  for (const asset of funds) {
+    try {
+      const res = await fetch(`/.netlify/functions/nav?proj_id=${encodeURIComponent(asset.projId)}`);
+      const json = await res.json();
+      if (res.ok && json.nav) {
+        const idx = data.assets.findIndex(a => a.id === asset.id);
+        if (idx !== -1) {
+          data.assets[idx].nav = json.nav;
+          data.assets[idx].currentValue = asset.units * json.nav;
+          data.assets[idx].navDate = json.date;
+          updated++;
+        }
+      }
+    } catch (_) {}
+  }
+  saveData(data);
+  renderAssetsPage();
+  showToast(`✅ อัพเดท NAV แล้ว ${updated} กองทุน`);
+}
+
 function _onAssetTypeChange() {
   const isFund = document.getElementById('asset-type').value === 'financial';
   document.getElementById('asset-direct-fields').style.display = isFund ? 'none' : 'block';
@@ -1624,9 +1671,11 @@ function openAssetModal(id) {
     document.getElementById('asset-type').value     = asset.type || 'other';
     document.getElementById('asset-note').value     = asset.note || '';
     if (asset.type === 'financial') {
-      document.getElementById('asset-units').value  = asset.units || '';
-      document.getElementById('asset-nav').value    = asset.nav || '';
-      document.getElementById('asset-cost').value   = asset.purchasePrice || '';
+      document.getElementById('asset-proj-id').value = asset.projId || '';
+      document.getElementById('asset-units').value   = asset.units || '';
+      document.getElementById('asset-nav').value     = asset.nav || '';
+      document.getElementById('asset-cost').value    = asset.purchasePrice || '';
+      document.getElementById('asset-nav-status').textContent = asset.navDate ? `NAV ล่าสุด: ${asset.navDate}` : '';
     } else {
       document.getElementById('asset-value').value    = asset.currentValue || '';
       document.getElementById('asset-purchase').value = asset.purchasePrice || '';
@@ -1636,10 +1685,12 @@ function openAssetModal(id) {
     document.getElementById('asset-type').value     = 'property';
     document.getElementById('asset-value').value    = '';
     document.getElementById('asset-purchase').value = '';
+    document.getElementById('asset-proj-id').value  = '';
     document.getElementById('asset-units').value    = '';
     document.getElementById('asset-nav').value      = '';
     document.getElementById('asset-cost').value     = '';
     document.getElementById('asset-note').value     = '';
+    document.getElementById('asset-nav-status').textContent = '';
     document.getElementById('asset-fund-calc').style.display = 'none';
   }
   _onAssetTypeChange();
@@ -1654,11 +1705,12 @@ function saveAsset() {
 
   let obj;
   if (type === 'financial') {
-    const units = parseFloat(document.getElementById('asset-units').value.replace(/,/g,'')) || 0;
-    const nav   = parseFloat(document.getElementById('asset-nav').value.replace(/,/g,'')) || 0;
-    const cost  = parseFloat(document.getElementById('asset-cost').value.replace(/,/g,'')) || 0;
+    const projId = document.getElementById('asset-proj-id').value.trim();
+    const units  = parseFloat(document.getElementById('asset-units').value.replace(/,/g,'')) || 0;
+    const nav    = parseFloat(document.getElementById('asset-nav').value.replace(/,/g,'')) || 0;
+    const cost   = parseFloat(document.getElementById('asset-cost').value.replace(/,/g,'')) || 0;
     if (!units || !nav) { alert('กรุณาใส่จำนวนหน่วยและ NAV'); return; }
-    obj = { name, type, units, nav, currentValue: units * nav, purchasePrice: cost, note };
+    obj = { name, type, projId, units, nav, currentValue: units * nav, purchasePrice: cost, note };
   } else {
     const value    = parseFloat(document.getElementById('asset-value').value.replace(/,/g,'')) || 0;
     const purchase = parseFloat(document.getElementById('asset-purchase').value.replace(/,/g,'')) || 0;

@@ -314,7 +314,10 @@
     <div id="page-assets" class="page">
       <div id="assets-net-worth" class="card" style="margin-bottom:12px"></div>
       <div id="assets-container"></div>
-      <button onclick="openAssetModal()" class="btn-primary" style="margin-bottom:12px">+ เพิ่มสินทรัพย์</button>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button onclick="openAssetModal()" class="btn-primary" style="flex:1">+ เพิ่มสินทรัพย์</button>
+        <button onclick="_autoRefreshAllFundNavs()" class="btn-secondary" style="white-space:nowrap">🔄 อัพ NAV</button>
+      </div>
     </div>
 
     <!-- ===== SETTINGS ===== -->
@@ -379,6 +382,12 @@
 
     <!-- fields: หน่วยลงทุน × NAV (financial only) -->
     <div id="asset-fund-fields" style="display:none">
+      <label class="form-label" style="margin-top:10px">SEC Proj ID <span style="font-weight:400;color:#9E9E9E">(เช่น M0643_2555)</span></label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="asset-proj-id" class="form-input" placeholder="M0000_0000" style="flex:1">
+        <button onclick="_fetchNavByProjId()" class="btn-secondary" style="white-space:nowrap;padding:10px 12px">🔄 ดึง NAV</button>
+      </div>
+      <div id="asset-nav-status" style="font-size:12px;color:#9E9E9E;margin-top:4px"></div>
       <label class="form-label" style="margin-top:10px">จำนวนหน่วยลงทุน</label>
       <input type="text" inputmode="decimal" id="asset-units" class="form-input" placeholder="0.0000" oninput="_calcFundValue()">
       <label class="form-label" style="margin-top:10px">NAV ล่าสุด (บาท/หน่วย)</label>
