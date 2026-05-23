@@ -1521,6 +1521,7 @@ function deleteInstall() {
 // ===== ASSETS =====
 
 const ASSET_TYPES = {
+  savings:   { icon: '💰', label: 'เงินออม / เงินฝาก' },
   property:  { icon: '🏠', label: 'บ้าน / คอนโด' },
   vehicle:   { icon: '🚗', label: 'รถ / มอเตอร์ไซค์' },
   financial: { icon: '💵', label: 'กองทุนรวม' },
@@ -1567,7 +1568,7 @@ function renderAssetsPage() {
   assets.forEach(a => { if (!groups[a.type]) groups[a.type] = []; groups[a.type].push(a); });
 
   let html = '';
-  ['property','vehicle','financial','stock','gold','other'].forEach(type => {
+  ['savings','property','vehicle','financial','stock','gold','other'].forEach(type => {
     if (!groups[type]) return;
     const { icon, label } = ASSET_TYPES[type];
     const groupTotal = groups[type].reduce((s, a) => s + (a.currentValue || 0), 0);
@@ -1601,7 +1602,9 @@ function renderAssetsPage() {
           : '';
       }
       let subHtml = '';
-      if (a.type === 'financial' && a.units)
+      if (a.type === 'savings' && a.bank)
+        subHtml = `<span style="font-size:11px;color:#9E9E9E">${a.bank}${a.interest ? ` · ${a.interest}%/ปี` : ''}</span>`;
+      else if (a.type === 'financial' && a.units)
         subHtml = `<span style="font-size:11px;color:#9E9E9E">${Number(a.units).toLocaleString()} หน่วย × ฿${(a.nav||0).toLocaleString()}</span>`;
       else if (a.type === 'stock' && a.shares)
         subHtml = `<span style="font-size:11px;color:#9E9E9E">${a.ticker} ${Number(a.shares).toLocaleString()} shares × $${(a.priceUsd||0).toLocaleString()}</span>`;
@@ -1807,10 +1810,11 @@ async function _autoRefreshAllFundNavs() {
 
 function _onAssetTypeChange() {
   const type = document.getElementById('asset-type').value;
-  document.getElementById('asset-direct-fields').style.display = ['property','vehicle','other'].includes(type) ? 'block' : 'none';
-  document.getElementById('asset-fund-fields').style.display   = type === 'financial' ? 'block' : 'none';
-  document.getElementById('asset-stock-fields').style.display  = type === 'stock'     ? 'block' : 'none';
-  document.getElementById('asset-gold-fields').style.display   = type === 'gold'      ? 'block' : 'none';
+  document.getElementById('asset-savings-fields').style.display = type === 'savings'   ? 'block' : 'none';
+  document.getElementById('asset-direct-fields').style.display  = ['property','vehicle','other'].includes(type) ? 'block' : 'none';
+  document.getElementById('asset-fund-fields').style.display    = type === 'financial' ? 'block' : 'none';
+  document.getElementById('asset-stock-fields').style.display   = type === 'stock'     ? 'block' : 'none';
+  document.getElementById('asset-gold-fields').style.display    = type === 'gold'      ? 'block' : 'none';
 }
 
 function _calcFundValue() {
@@ -1886,7 +1890,12 @@ function openAssetModal(id) {
     document.getElementById('asset-name').value     = asset.name;
     document.getElementById('asset-type').value     = asset.type || 'other';
     document.getElementById('asset-note').value     = asset.note || '';
-    if (asset.type === 'financial') {
+    if (asset.type === 'savings') {
+      document.getElementById('asset-bank').value       = asset.bank || '';
+      document.getElementById('asset-account-no').value = asset.accountNo || '';
+      document.getElementById('asset-balance').value    = asset.currentValue || '';
+      document.getElementById('asset-interest').value   = asset.interest || '';
+    } else if (asset.type === 'financial') {
       document.getElementById('asset-proj-id').value     = asset.projId || '';
       document.getElementById('asset-fund-search').value = asset.name || '';
       document.getElementById('asset-units').value       = asset.units || '';
@@ -1911,10 +1920,14 @@ function openAssetModal(id) {
     }
   } else {
     document.getElementById('asset-name').value       = '';
-    document.getElementById('asset-type').value       = 'property';
+    document.getElementById('asset-type').value       = 'savings';
     document.getElementById('asset-value').value      = '';
     document.getElementById('asset-purchase').value   = '';
     document.getElementById('asset-proj-id').value      = '';
+    document.getElementById('asset-bank').value        = '';
+    document.getElementById('asset-account-no').value  = '';
+    document.getElementById('asset-balance').value     = '';
+    document.getElementById('asset-interest').value    = '';
     document.getElementById('asset-fund-search').value  = '';
     document.getElementById('asset-fund-results').style.display = 'none';
     document.getElementById('asset-units').value        = '';
@@ -1947,7 +1960,14 @@ function saveAsset() {
   if (!name) { alert('กรุณาใส่ชื่อสินทรัพย์'); return; }
 
   let obj;
-  if (type === 'financial') {
+  if (type === 'savings') {
+    const bank      = document.getElementById('asset-bank').value.trim();
+    const accountNo = document.getElementById('asset-account-no').value.trim();
+    const balance   = parseFloat(document.getElementById('asset-balance').value.replace(/,/g,'')) || 0;
+    const interest  = parseFloat(document.getElementById('asset-interest').value.replace(/,/g,'')) || 0;
+    if (!balance) { alert('กรุณาใส่ยอดเงิน'); return; }
+    obj = { name, type, bank, accountNo, currentValue: balance, interest, note };
+  } else if (type === 'financial') {
     const projId = document.getElementById('asset-proj-id').value.trim();
     const units  = parseFloat(document.getElementById('asset-units').value.replace(/,/g,'')) || 0;
     const nav    = parseFloat(document.getElementById('asset-nav').value.replace(/,/g,'')) || 0;

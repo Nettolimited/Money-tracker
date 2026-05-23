@@ -366,6 +366,7 @@
     <input type="text" id="asset-name" class="form-input" placeholder="เช่น บ้านหมู่บ้านสุขใจ, Toyota Yaris">
     <label class="form-label" style="margin-top:10px">ประเภท</label>
     <select id="asset-type" class="form-input" onchange="_onAssetTypeChange()">
+      <option value="savings">💰 เงินออม / เงินฝาก</option>
       <option value="property">🏠 บ้าน / คอนโด</option>
       <option value="vehicle">🚗 รถ / มอเตอร์ไซค์</option>
       <option value="financial">💵 กองทุนรวม (SEC)</option>
@@ -373,6 +374,18 @@
       <option value="gold">🥇 ทองคำ</option>
       <option value="other">📦 ของมีค่า / อื่นๆ</option>
     </select>
+
+    <!-- fields: เงินออม -->
+    <div id="asset-savings-fields" style="display:none">
+      <label class="form-label" style="margin-top:10px">ธนาคาร / ที่เก็บ</label>
+      <input type="text" id="asset-bank" class="form-input" placeholder="เช่น SCB, กรุงไทย, กระเป๋าเงินสด">
+      <label class="form-label" style="margin-top:10px">เลขบัญชี (ไม่บังคับ)</label>
+      <input type="text" id="asset-account-no" class="form-input" placeholder="xxx-x-xxxxx-x">
+      <label class="form-label" style="margin-top:10px">ยอดเงิน (บาท)</label>
+      <input type="text" inputmode="decimal" id="asset-balance" class="form-input" placeholder="0">
+      <label class="form-label" style="margin-top:10px">ดอกเบี้ย % ต่อปี — ไม่บังคับ</label>
+      <input type="text" inputmode="decimal" id="asset-interest" class="form-input" placeholder="0.5">
+    </div>
 
     <!-- fields: ราคาตรง (property/vehicle/other) -->
     <div id="asset-direct-fields">
