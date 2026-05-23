@@ -414,8 +414,17 @@
       <label class="form-label" style="margin-top:10px">ราคา/หุ้น (USD)</label>
       <input type="text" inputmode="decimal" id="asset-price-usd" class="form-input" placeholder="0.00" oninput="_calcStockValue()">
       <div id="asset-stock-calc" style="text-align:right;margin-top:6px;font-size:13px;color:var(--primary);font-weight:700;display:none"></div>
-      <label class="form-label" style="margin-top:10px">ต้นทุนรวม (บาท) — ไม่บังคับ</label>
-      <input type="text" inputmode="decimal" id="asset-stock-cost" class="form-input" placeholder="0">
+      <label class="form-label" style="margin-top:10px">ต้นทุนรวม — ไม่บังคับ</label>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">USD</div>
+          <input type="text" inputmode="decimal" id="asset-stock-cost-usd" class="form-input" placeholder="0.00" oninput="_autoConvertStockCost()">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">THB (฿)</div>
+          <input type="text" inputmode="decimal" id="asset-stock-cost-thb" class="form-input" placeholder="0">
+        </div>
+      </div>
     </div>
 
     <!-- fields: ทองคำ -->

@@ -1577,10 +1577,29 @@ function renderAssetsPage() {
         <span style="font-size:13px;font-weight:700;color:var(--primary)">฿${groupTotal.toLocaleString()}</span>
       </div>`;
     groups[type].forEach(a => {
-      const gain = a.purchasePrice ? a.currentValue - a.purchasePrice : null;
-      const gainHtml = gain !== null
-        ? `<span style="font-size:11px;color:${gain >= 0 ? '#2ecc71' : '#e74c3c'}">${gain >= 0 ? '▲' : '▼'} ฿${Math.abs(gain).toLocaleString()}</span>`
-        : '';
+      let gain, gainHtml;
+      if (a.type === 'stock') {
+        // stock: แสดง gain ทั้ง USD และ THB
+        const costUsd = a.purchasePriceUsd || 0;
+        const costThb = a.purchasePrice    || 0;
+        const currentUsd = (a.shares || 0) * (a.priceUsd || 0);
+        if (costUsd > 0) {
+          const gainUsd = currentUsd - costUsd;
+          const gainThb = (a.currentValue || 0) - costThb;
+          const color = gainUsd >= 0 ? '#2ecc71' : '#e74c3c';
+          const arrow = gainUsd >= 0 ? '▲' : '▼';
+          gainHtml = `<span style="font-size:11px;color:${color}">${arrow} $${Math.abs(gainUsd).toLocaleString('en', {minimumFractionDigits:2,maximumFractionDigits:2})} / ฿${Math.abs(gainThb).toLocaleString()}</span>`;
+        } else if (costThb > 0) {
+          const gainThb = (a.currentValue || 0) - costThb;
+          const color = gainThb >= 0 ? '#2ecc71' : '#e74c3c';
+          gainHtml = `<span style="font-size:11px;color:${color}">${gainThb >= 0 ? '▲' : '▼'} ฿${Math.abs(gainThb).toLocaleString()}</span>`;
+        } else { gainHtml = ''; }
+      } else {
+        gain = a.purchasePrice ? a.currentValue - a.purchasePrice : null;
+        gainHtml = gain !== null
+          ? `<span style="font-size:11px;color:${gain >= 0 ? '#2ecc71' : '#e74c3c'}">${gain >= 0 ? '▲' : '▼'} ฿${Math.abs(gain).toLocaleString()}</span>`
+          : '';
+      }
       let subHtml = '';
       if (a.type === 'financial' && a.units)
         subHtml = `<span style="font-size:11px;color:#9E9E9E">${Number(a.units).toLocaleString()} หน่วย × ฿${(a.nav||0).toLocaleString()}</span>`;
@@ -1613,6 +1632,14 @@ function _calcStockValue() {
     calc.textContent = `= ฿${thb.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     calc.style.display = 'block';
   } else { calc.style.display = 'none'; }
+}
+
+function _autoConvertStockCost() {
+  const usd    = parseFloat(document.getElementById('asset-stock-cost-usd').value.replace(/,/g,'')) || 0;
+  const usdThb = parseFloat(document.getElementById('asset-price-usd').dataset.usdThb || '0') || 0;
+  if (usd > 0 && usdThb > 0) {
+    document.getElementById('asset-stock-cost-thb').value = (usd * usdThb).toFixed(2);
+  }
 }
 
 function _calcGoldValue() {
@@ -1870,7 +1897,8 @@ function openAssetModal(id) {
       document.getElementById('asset-ticker').value     = asset.ticker || '';
       document.getElementById('asset-shares').value     = asset.shares || '';
       document.getElementById('asset-price-usd').value  = asset.priceUsd || '';
-      document.getElementById('asset-stock-cost').value = asset.purchasePrice || '';
+      document.getElementById('asset-stock-cost-usd').value = asset.purchasePriceUsd || '';
+      document.getElementById('asset-stock-cost-thb').value = asset.purchasePrice || '';
       document.getElementById('asset-stock-status').textContent = asset.priceDate ? `ราคา: ${asset.priceDate}` : '';
     } else if (asset.type === 'gold') {
       document.getElementById('asset-grams').value      = asset.grams || '';
@@ -1895,7 +1923,8 @@ function openAssetModal(id) {
     document.getElementById('asset-ticker').value     = '';
     document.getElementById('asset-shares').value     = '';
     document.getElementById('asset-price-usd').value  = '';
-    document.getElementById('asset-stock-cost').value = '';
+    document.getElementById('asset-stock-cost-usd').value = '';
+    document.getElementById('asset-stock-cost-thb').value = '';
     document.getElementById('asset-grams').value      = '';
     document.getElementById('asset-gold-price').value = '';
     document.getElementById('asset-gold-cost').value  = '';
@@ -1930,9 +1959,10 @@ function saveAsset() {
     const shares   = parseFloat(document.getElementById('asset-shares').value.replace(/,/g,'')) || 0;
     const priceUsd = parseFloat(document.getElementById('asset-price-usd').value.replace(/,/g,'')) || 0;
     const usdThb   = parseFloat(document.getElementById('asset-price-usd').dataset.usdThb || '33');
-    const cost     = parseFloat(document.getElementById('asset-stock-cost').value.replace(/,/g,'')) || 0;
+    const costUsd  = parseFloat(document.getElementById('asset-stock-cost-usd').value.replace(/,/g,'')) || 0;
+    const costThb  = parseFloat(document.getElementById('asset-stock-cost-thb').value.replace(/,/g,'')) || 0;
     if (!ticker || !shares || !priceUsd) { alert('กรุณาใส่ Ticker, จำนวนหุ้น และราคา'); return; }
-    obj = { name, type, ticker, shares, priceUsd, usdThb, currentValue: shares * priceUsd * usdThb, purchasePrice: cost, note };
+    obj = { name, type, ticker, shares, priceUsd, usdThb, currentValue: shares * priceUsd * usdThb, purchasePriceUsd: costUsd, purchasePrice: costThb, note };
   } else if (type === 'gold') {
     const grams       = parseFloat(document.getElementById('asset-grams').value.replace(/,/g,'')) || 0;
     const priceThbGram= parseFloat(document.getElementById('asset-gold-price').value.replace(/,/g,'')) || 0;
