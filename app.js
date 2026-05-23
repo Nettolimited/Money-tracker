@@ -2091,6 +2091,35 @@ function deleteAsset() {
   renderAssetsPage();
 }
 
+function _seedGadgetItems() {
+  const data = getData();
+  if (data._gadgetSeeded) return;
+  if (!data.assets) data.assets = [];
+
+  const items = [
+    { name: 'Samsung S26 Ultra 12/512',               category: 'IT',     purchaseDate: '2026-03-14', purchasePrice: 30800, depreciationRate: 25, payment: 'KBANK - 0% 10', warrantyExpiry: '2027-03-14', store: 'AIS'  },
+    { name: 'Insta 360 X5 Essentail Bundle',           category: 'Camera', purchaseDate: '2025-12-17', purchasePrice: 17060, depreciationRate: 20, payment: 'KTC - 0% 10',   warrantyExpiry: '2026-12-17', store: ''     },
+    { name: 'AeroBand PocketDrum2',                    category: 'Music',  purchaseDate: '2025-12-17', purchasePrice:  3465, depreciationRate: 15, payment: 'KTC',            warrantyExpiry: '2026-12-17', store: ''     },
+    { name: 'Donner Hush-I Electric Acoustic Guitar',  category: 'Music',  purchaseDate: '2025-11-30', purchasePrice:  4630, depreciationRate: 15, payment: 'KTC',            warrantyExpiry: '2026-11-30', store: ''     },
+    { name: 'Samsung Bud 3 Pro',                       category: 'IT',     purchaseDate: '2024-07-28', purchasePrice:  5243, depreciationRate: 25, payment: 'KTC - 0% 4',    warrantyExpiry: '2025-07-28', store: ''     },
+    { name: 'Galaxy Watch 7',                          category: 'IT',     purchaseDate: '2024-07-21', purchasePrice:  7085, depreciationRate: 25, payment: 'KTC - 0% 4',    warrantyExpiry: '2025-07-21', store: ''     },
+    { name: 'PS5',                                     category: 'IT',     purchaseDate: '2023-07-08', purchasePrice: 18690, depreciationRate: 25, payment: 'KTC - 0% 6',    warrantyExpiry: '2023-07-08', store: ''     },
+    { name: 'LG Monitor',                              category: 'IT',     purchaseDate: '2023-07-08', purchasePrice:  5840, depreciationRate: 20, payment: 'KTC - 0% 6',    warrantyExpiry: '2023-07-08', store: ''     },
+    { name: 'MacBook Pro 13" M2 (2022)',               category: 'IT',     purchaseDate: '2023-03-01', purchasePrice: 56900, depreciationRate: 25, payment: 'KBANK - 0% 10', warrantyExpiry: '2024-03-01', store: ''     },
+    { name: "iPad 11\" Gen3 M1",                       category: 'IT',     purchaseDate: '2022-07-22', purchasePrice: 32900, depreciationRate: 25, payment: 'แม่เหมียว',      warrantyExpiry: '2023-07-22', store: ''     },
+    { name: 'ASUS Notebook',                           category: 'IT',     purchaseDate: '2021-11-26', purchasePrice: 34900, depreciationRate: 25, payment: 'เอนก',           warrantyExpiry: '2023-11-26', store: ''     },
+  ];
+
+  items.forEach(item => {
+    const currentValue = _calcGadgetCurrentValue(item.purchasePrice, item.purchaseDate, item.depreciationRate);
+    data.assets.push({ id: genId(), type: 'gadget', note: '', ...item, currentValue });
+  });
+
+  data._gadgetSeeded = true;
+  saveData(data);
+  showToast('📱 เพิ่มของมีค่า 11 รายการแล้ว');
+}
+
 // ===== SETTINGS =====
 
 function saveCycleDay(day) {
@@ -3084,6 +3113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sync from Firebase first, then start app
   await initSync();
+  _seedGadgetItems();
 
   // Apply theme before render
   applyTheme();
