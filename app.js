@@ -704,9 +704,47 @@ function onInstallSelect(val) {
 function selectCat(name)     { state.addCat     = name; updateCatGrid(); }
 function selectAccount(name) { state.addAccount = name; updateAccountChips(); }
 
+function _safeCalc(expr) {
+  const clean = String(expr).replace(/,/g,'').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').trim();
+  if (!clean || !/^[\d\s\+\-\*\/\.\(\)]+$/.test(clean)) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function('"use strict";return(' + clean + ')')();
+    return (typeof result === 'number' && isFinite(result) && result >= 0) ? result : null;
+  } catch { return null; }
+}
+
+function _updateAmountCalc() {
+  const val = document.getElementById('form-amount').value;
+  const el  = document.getElementById('form-amount-result');
+  if (!/[\+\-\*\/\(]/.test(val)) { el.style.display = 'none'; return; }
+  const result = _safeCalc(val);
+  if (result === null) { el.style.display = 'none'; return; }
+  el.textContent = '= ฿' + result.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  el.style.display = 'block';
+}
+
+function _calcInsert(op) {
+  const input = document.getElementById('form-amount');
+  const pos   = input.selectionStart ?? input.value.length;
+  input.value = input.value.slice(0, pos) + op + input.value.slice(pos);
+  input.setSelectionRange(pos + 1, pos + 1);
+  input.focus();
+  _updateAmountCalc();
+}
+
+function _calcEval() {
+  const input  = document.getElementById('form-amount');
+  const result = _safeCalc(input.value);
+  if (result === null) return;
+  input.value = result % 1 === 0 ? result.toString() : result.toFixed(2);
+  document.getElementById('form-amount-result').style.display = 'none';
+  input.focus();
+}
+
 function saveTransaction() {
   const rawAmt = document.getElementById('form-amount').value.replace(/,/g, '');
-  const amount  = parseFloat(rawAmt);
+  const amount  = _safeCalc(rawAmt) ?? parseFloat(rawAmt);
   const date    = document.getElementById('form-date').value;
   const note    = document.getElementById('form-note').value.trim();
 

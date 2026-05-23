@@ -125,7 +125,17 @@
         </div>
 
         <div style="text-align:center;color:#9E9E9E;font-size:13px;margin-bottom:4px">จำนวนเงิน (บาท)</div>
-        <input type="text" inputmode="decimal" id="form-amount" class="amount-input" placeholder="0.00">
+        <input type="text" inputmode="decimal" id="form-amount" class="amount-input" placeholder="0.00" oninput="_updateAmountCalc()">
+        <div class="calc-chips">
+          <button type="button" class="calc-chip" onclick="_calcInsert('+')">+</button>
+          <button type="button" class="calc-chip" onclick="_calcInsert('-')">−</button>
+          <button type="button" class="calc-chip" onclick="_calcInsert('*')">×</button>
+          <button type="button" class="calc-chip" onclick="_calcInsert('/')">÷</button>
+          <button type="button" class="calc-chip" onclick="_calcInsert('(')">(</button>
+          <button type="button" class="calc-chip" onclick="_calcInsert(')')">)</button>
+          <button type="button" class="calc-chip calc-chip-eq" onclick="_calcEval()">=</button>
+        </div>
+        <div id="form-amount-result" style="display:none;text-align:center;font-size:18px;font-weight:800;color:var(--primary);margin-bottom:8px"></div>
 
         <div class="form-group">
           <label class="form-label">หมวดหมู่</label>
