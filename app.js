@@ -1552,6 +1552,24 @@ function _gadgetCategoryDefaults() {
   _calcGadgetValue();
 }
 
+function _calcWarrantyExpiry() {
+  const purchaseDate = document.getElementById('asset-gadget-date').value;
+  const years  = parseInt(document.getElementById('asset-gadget-warranty-y').value) || 0;
+  const months = parseInt(document.getElementById('asset-gadget-warranty-m').value) || 0;
+  const hint   = document.getElementById('asset-gadget-warranty-hint');
+  if (!purchaseDate || (!years && !months)) { hint.style.display = 'none'; return; }
+  const d = new Date(purchaseDate);
+  d.setFullYear(d.getFullYear() + years);
+  d.setMonth(d.getMonth() + months);
+  const expiry = d.toISOString().slice(0, 10);
+  document.getElementById('asset-gadget-warranty').value = expiry;
+  const daysLeft = Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24));
+  const daysText = daysLeft > 0 ? `เหลือ ${daysLeft} วัน` : 'หมดแล้ว';
+  hint.textContent = `หมดประกัน ${expiry} (${daysText})`;
+  hint.style.color = daysLeft > 30 ? 'var(--primary)' : daysLeft > 0 ? '#f39c12' : '#e74c3c';
+  hint.style.display = 'block';
+}
+
 function _calcGadgetValue() {
   const date  = document.getElementById('asset-gadget-date').value;
   const price = parseFloat((document.getElementById('asset-gadget-price').value || '').replace(/,/g,'')) || 0;
@@ -2002,6 +2020,9 @@ function openAssetModal(id) {
     _setVal('asset-gadget-rate', '');
     _setVal('asset-gadget-payment', '');
     _setVal('asset-gadget-warranty', '');
+    _setVal('asset-gadget-warranty-y', '');
+    _setVal('asset-gadget-warranty-m', '');
+    _setDisp('asset-gadget-warranty-hint', 'none');
     _setVal('asset-gadget-store', '');
     _setDisp('asset-gadget-calc', 'none');
     _setVal('asset-note', '');
