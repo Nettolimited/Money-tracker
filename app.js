@@ -1546,9 +1546,10 @@ function renderAssetsPage() {
         <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">สินทรัพย์รวม</div>
         <div style="font-size:15px;font-weight:800;color:#2ecc71">฿${totalAssets.toLocaleString()}</div>
       </div>
-      <div style="flex:1;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+      <div style="flex:1;border-left:1px solid var(--border);border-right:1px solid var(--border);cursor:pointer" onclick="_showDebtBreakdown()">
         <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">หนี้สิน</div>
         <div style="font-size:15px;font-weight:800;color:#e74c3c">฿${totalDebt.toLocaleString()}</div>
+        <div style="font-size:10px;color:#9E9E9E;margin-top:2px">แตะดูรายละเอียด</div>
       </div>
       <div style="flex:1">
         <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">Net Worth</div>
@@ -1795,6 +1796,56 @@ function _calcFundValue() {
   } else {
     calc.style.display = 'none';
   }
+}
+
+function _showDebtBreakdown() {
+  const data = getData();
+  const installments = (data.installments || []).filter(i => i.paidMonths < i.totalMonths);
+
+  if (!installments.length) {
+    alert('ไม่มีรายการผ่อนที่ค้างอยู่');
+    return;
+  }
+
+  const rows = installments.map(i => {
+    const remaining = Math.max(0, i.totalMonths - i.paidMonths);
+    const total = remaining * i.amountPerMonth;
+    return `<tr>
+      <td style="padding:8px 4px;border-bottom:1px solid var(--border);font-size:13px">${i.name}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid var(--border);font-size:13px;text-align:center;color:#9E9E9E">${remaining} งวด × ฿${i.amountPerMonth.toLocaleString()}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid var(--border);font-size:13px;text-align:right;font-weight:700;color:#e74c3c">฿${total.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  const totalDebt = installments.reduce((s, i) => s + Math.max(0, i.totalMonths - i.paidMonths) * i.amountPerMonth, 0);
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:75vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <span style="font-size:16px;font-weight:800">💳 รายละเอียดหนี้สิน</span>
+        <span onclick="this.closest('[style*=fixed]').remove()" style="font-size:22px;cursor:pointer;line-height:1">×</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;font-size:11px;color:#9E9E9E;padding-bottom:6px">รายการ</th>
+            <th style="text-align:center;font-size:11px;color:#9E9E9E;padding-bottom:6px">งวดคงเหลือ</th>
+            <th style="text-align:right;font-size:11px;color:#9E9E9E;padding-bottom:6px">ยอดรวม</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="padding-top:10px;font-size:13px;font-weight:700">รวมทั้งหมด</td>
+            <td style="padding-top:10px;font-size:15px;font-weight:800;color:#e74c3c;text-align:right">฿${totalDebt.toLocaleString()}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 function openAssetModal(id) {
