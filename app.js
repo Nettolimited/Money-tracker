@@ -1567,7 +1567,7 @@ function renderAssetsPage() {
   assets.forEach(a => { if (!groups[a.type]) groups[a.type] = []; groups[a.type].push(a); });
 
   let html = '';
-  ['property','vehicle','financial','other'].forEach(type => {
+  ['property','vehicle','financial','stock','gold','other'].forEach(type => {
     if (!groups[type]) return;
     const { icon, label } = ASSET_TYPES[type];
     const groupTotal = groups[type].reduce((s, a) => s + (a.currentValue || 0), 0);
