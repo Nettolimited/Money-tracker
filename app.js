@@ -388,6 +388,11 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+// safe DOM helpers — ป้องกัน crash ถ้า element ยังไม่มีใน HTML เก่า
+function _setVal(id, v)  { const el = document.getElementById(id); if (el) el.value = v ?? ''; }
+function _setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v ?? ''; }
+function _setDisp(id, v) { const el = document.getElementById(id); if (el) el.style.display = v; }
+
 function getCycleDay() {
   try { return getData().cycleDay || 1; } catch { return 1; }
 }
@@ -1810,11 +1815,11 @@ async function _autoRefreshAllFundNavs() {
 
 function _onAssetTypeChange() {
   const type = document.getElementById('asset-type').value;
-  document.getElementById('asset-savings-fields').style.display = type === 'savings'   ? 'block' : 'none';
-  document.getElementById('asset-direct-fields').style.display  = ['property','vehicle','other'].includes(type) ? 'block' : 'none';
-  document.getElementById('asset-fund-fields').style.display    = type === 'financial' ? 'block' : 'none';
-  document.getElementById('asset-stock-fields').style.display   = type === 'stock'     ? 'block' : 'none';
-  document.getElementById('asset-gold-fields').style.display    = type === 'gold'      ? 'block' : 'none';
+  _setDisp('asset-savings-fields', type === 'savings'   ? 'block' : 'none');
+  _setDisp('asset-direct-fields',  ['property','vehicle','other'].includes(type) ? 'block' : 'none');
+  _setDisp('asset-fund-fields',    type === 'financial' ? 'block' : 'none');
+  _setDisp('asset-stock-fields',   type === 'stock'     ? 'block' : 'none');
+  _setDisp('asset-gold-fields',    type === 'gold'      ? 'block' : 'none');
 }
 
 function _calcFundValue() {
@@ -1891,10 +1896,10 @@ function openAssetModal(id) {
     document.getElementById('asset-type').value     = asset.type || 'other';
     document.getElementById('asset-note').value     = asset.note || '';
     if (asset.type === 'savings') {
-      document.getElementById('asset-bank').value       = asset.bank || '';
-      document.getElementById('asset-account-no').value = asset.accountNo || '';
-      document.getElementById('asset-balance').value    = asset.currentValue || '';
-      document.getElementById('asset-interest').value   = asset.interest || '';
+      _setVal('asset-bank',       asset.bank || '');
+      _setVal('asset-account-no', asset.accountNo || '');
+      _setVal('asset-balance',    asset.currentValue || '');
+      _setVal('asset-interest',   asset.interest || '');
     } else if (asset.type === 'financial') {
       document.getElementById('asset-proj-id').value     = asset.projId || '';
       document.getElementById('asset-fund-search').value = asset.name || '';
@@ -1924,26 +1929,26 @@ function openAssetModal(id) {
     document.getElementById('asset-value').value      = '';
     document.getElementById('asset-purchase').value   = '';
     document.getElementById('asset-proj-id').value      = '';
-    document.getElementById('asset-bank').value        = '';
-    document.getElementById('asset-account-no').value  = '';
-    document.getElementById('asset-balance').value     = '';
-    document.getElementById('asset-interest').value    = '';
-    document.getElementById('asset-fund-search').value  = '';
-    document.getElementById('asset-fund-results').style.display = 'none';
-    document.getElementById('asset-units').value        = '';
-    document.getElementById('asset-nav').value        = '';
-    document.getElementById('asset-cost').value       = '';
-    document.getElementById('asset-ticker').value     = '';
-    document.getElementById('asset-shares').value     = '';
-    document.getElementById('asset-price-usd').value  = '';
-    document.getElementById('asset-stock-cost-usd').value = '';
-    document.getElementById('asset-stock-cost-thb').value = '';
-    document.getElementById('asset-grams').value      = '';
-    document.getElementById('asset-gold-price').value = '';
-    document.getElementById('asset-gold-cost').value  = '';
-    document.getElementById('asset-note').value       = '';
-    document.getElementById('asset-nav-status').textContent   = '';
-    document.getElementById('asset-stock-status').textContent = '';
+    _setVal('asset-bank', '');
+    _setVal('asset-account-no', '');
+    _setVal('asset-balance', '');
+    _setVal('asset-interest', '');
+    _setVal('asset-fund-search', '');
+    _setDisp('asset-fund-results', 'none');
+    _setVal('asset-units', '');
+    _setVal('asset-nav', '');
+    _setVal('asset-cost', '');
+    _setVal('asset-ticker', '');
+    _setVal('asset-shares', '');
+    _setVal('asset-price-usd', '');
+    _setVal('asset-stock-cost-usd', '');
+    _setVal('asset-stock-cost-thb', '');
+    _setVal('asset-grams', '');
+    _setVal('asset-gold-price', '');
+    _setVal('asset-gold-cost', '');
+    _setVal('asset-note', '');
+    _setText('asset-nav-status', '');
+    _setText('asset-stock-status', '');
     document.getElementById('asset-gold-status').textContent  = '';
     document.getElementById('asset-fund-calc').style.display  = 'none';
     document.getElementById('asset-stock-calc').style.display = 'none';
