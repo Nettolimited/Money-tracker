@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '4.2';
+const APP_VERSION = '4.8';
 const CHANGELOG = [
+  { v: '4.8', date: '23 พ.ค. 68', note: '📱 ของมีค่า/อุปกรณ์: คำนวณเสื่อมอัตโนมัติ, วันหมดประกัน, ร้านเคลม, หมวดหมู่' },
   { v: '4.2', date: '23 พ.ค. 68', note: '🔍 ค้นหากองทุนจากชื่อได้เลย ไม่ต้องรู้ Proj ID' },
   { v: '4.1', date: '23 พ.ค. 68', note: '📈 หุ้น US + 🥇 ทองคำ: ดึงราคา real-time จาก Yahoo Finance แปลง THB อัตโนมัติ' },
   { v: '4.0', date: '23 พ.ค. 68', note: '🤖 ดึง NAV กองทุนอัตโนมัติจาก SEC Thailand API + ปุ่ม อัพ NAV ทั้งหมด' },
@@ -1532,8 +1533,36 @@ const ASSET_TYPES = {
   financial: { icon: '💵', label: 'กองทุนรวม' },
   stock:     { icon: '📈', label: 'หุ้น US / ETF' },
   gold:      { icon: '🥇', label: 'ทองคำ' },
-  other:     { icon: '📦', label: 'ของมีค่า / อื่นๆ' },
+  gadget:    { icon: '📱', label: 'ของมีค่า / อุปกรณ์' },
+  other:     { icon: '📦', label: 'อื่นๆ' },
 };
+
+const GADGET_DEPRECIATION = { IT: 25, Camera: 20, Music: 15, 'เครื่องใช้ไฟฟ้า': 20, 'อื่นๆ': 15 };
+
+function _calcGadgetCurrentValue(purchasePrice, purchaseDate, rate) {
+  if (!purchaseDate || !purchasePrice) return purchasePrice || 0;
+  const years = (Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  return Math.round(purchasePrice * Math.max(0, Math.pow(1 - rate / 100, Math.max(0, years))));
+}
+
+function _gadgetCategoryDefaults() {
+  const cat  = document.getElementById('asset-gadget-category').value;
+  const rate = document.getElementById('asset-gadget-rate');
+  if (!rate.value) rate.value = GADGET_DEPRECIATION[cat] || 20;
+  _calcGadgetValue();
+}
+
+function _calcGadgetValue() {
+  const date  = document.getElementById('asset-gadget-date').value;
+  const price = parseFloat((document.getElementById('asset-gadget-price').value || '').replace(/,/g,'')) || 0;
+  const rate  = parseFloat(document.getElementById('asset-gadget-rate').value) || 0;
+  const calc  = document.getElementById('asset-gadget-calc');
+  if (!date || !price) { calc.style.display = 'none'; return; }
+  const cv    = _calcGadgetCurrentValue(price, date, rate);
+  const depPct = price > 0 ? Math.round((1 - cv / price) * 100) : 0;
+  calc.innerHTML = `มูลค่าปัจจุบัน ≈ <strong>฿${cv.toLocaleString()}</strong> <span style="color:#e74c3c">(เสื่อมไป ${depPct}% = ฿${(price - cv).toLocaleString()})</span>`;
+  calc.style.display = 'block';
+}
 
 function renderAssetsPage() {
   const data = getData();
@@ -1573,7 +1602,7 @@ function renderAssetsPage() {
   assets.forEach(a => { if (!groups[a.type]) groups[a.type] = []; groups[a.type].push(a); });
 
   let html = '';
-  ['savings','property','vehicle','financial','stock','gold','other'].forEach(type => {
+  ['savings','property','vehicle','financial','stock','gold','gadget','other'].forEach(type => {
     if (!groups[type]) return;
     const { icon, label } = ASSET_TYPES[type];
     const groupTotal = groups[type].reduce((s, a) => s + (a.currentValue || 0), 0);
@@ -1615,6 +1644,17 @@ function renderAssetsPage() {
         subHtml = `<span style="font-size:11px;color:#9E9E9E">${a.ticker} ${Number(a.shares).toLocaleString()} shares × $${(a.priceUsd||0).toLocaleString()}</span>`;
       else if (a.type === 'gold' && a.grams)
         subHtml = `<span style="font-size:11px;color:#9E9E9E">${Number(a.grams).toLocaleString()} g × ฿${(a.priceThbGram||0).toLocaleString()}/g</span>`;
+      else if (a.type === 'gadget') {
+        const depPct = a.purchasePrice > 0 ? Math.round((1 - (a.currentValue || 0) / a.purchasePrice) * 100) : 0;
+        const warnHtml = (() => {
+          if (!a.warrantyExpiry) return '';
+          const daysLeft = Math.ceil((new Date(a.warrantyExpiry) - Date.now()) / (1000 * 60 * 60 * 24));
+          if (daysLeft < 0) return `<span style="font-size:10px;background:#ffebee;color:#e74c3c;padding:1px 6px;border-radius:99px">ประกันหมดแล้ว</span>`;
+          if (daysLeft <= 30) return `<span style="font-size:10px;background:#fff3e0;color:#f39c12;padding:1px 6px;border-radius:99px">⚠️ เหลือ ${daysLeft} วัน</span>`;
+          return `<span style="font-size:10px;background:#e8f5e9;color:#2ecc71;padding:1px 6px;border-radius:99px">ประกัน ${daysLeft} วัน</span>`;
+        })();
+        subHtml = `<span style="font-size:11px;color:#9E9E9E">${a.category || ''}${a.purchasePrice ? ` · ฿${a.purchasePrice.toLocaleString()} → เสื่อม ${depPct}%` : ''}</span>${warnHtml}`;
+      }
       else if (a.note)
         subHtml = `<span style="font-size:12px;color:#9E9E9E">${a.note}</span>`;
       html += `<div onclick="openAssetModal('${a.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
@@ -1820,6 +1860,8 @@ function _onAssetTypeChange() {
   _setDisp('asset-fund-fields',    type === 'financial' ? 'block' : 'none');
   _setDisp('asset-stock-fields',   type === 'stock'     ? 'block' : 'none');
   _setDisp('asset-gold-fields',    type === 'gold'      ? 'block' : 'none');
+  _setDisp('asset-gadget-fields',  type === 'gadget'    ? 'block' : 'none');
+  if (type === 'gadget') _gadgetCategoryDefaults();
 }
 
 function _calcFundValue() {
@@ -1919,6 +1961,14 @@ function openAssetModal(id) {
       document.getElementById('asset-gold-price').value = asset.priceThbGram || '';
       document.getElementById('asset-gold-cost').value  = asset.purchasePrice || '';
       document.getElementById('asset-gold-status').textContent = asset.priceDate ? `ราคา: ${asset.priceDate}` : '';
+    } else if (asset.type === 'gadget') {
+      _setVal('asset-gadget-category', asset.category || 'IT');
+      _setVal('asset-gadget-date',     asset.purchaseDate || '');
+      _setVal('asset-gadget-price',    asset.purchasePrice || '');
+      _setVal('asset-gadget-rate',     asset.depreciationRate || '');
+      _setVal('asset-gadget-payment',  asset.payment || '');
+      _setVal('asset-gadget-warranty', asset.warrantyExpiry || '');
+      _setVal('asset-gadget-store',    asset.store || '');
     } else {
       document.getElementById('asset-value').value    = asset.currentValue || '';
       document.getElementById('asset-purchase').value = asset.purchasePrice || '';
@@ -1946,6 +1996,14 @@ function openAssetModal(id) {
     _setVal('asset-grams', '');
     _setVal('asset-gold-price', '');
     _setVal('asset-gold-cost', '');
+    _setVal('asset-gadget-category', 'IT');
+    _setVal('asset-gadget-date', '');
+    _setVal('asset-gadget-price', '');
+    _setVal('asset-gadget-rate', '');
+    _setVal('asset-gadget-payment', '');
+    _setVal('asset-gadget-warranty', '');
+    _setVal('asset-gadget-store', '');
+    _setDisp('asset-gadget-calc', 'none');
     _setVal('asset-note', '');
     _setText('asset-nav-status', '');
     _setText('asset-stock-status', '');
@@ -1994,6 +2052,17 @@ function saveAsset() {
     const cost        = parseFloat(document.getElementById('asset-gold-cost').value.replace(/,/g,'')) || 0;
     if (!grams || !priceThbGram) { alert('กรุณาใส่จำนวนกรัมและราคาทอง'); return; }
     obj = { name, type, grams, priceThbGram, currentValue: grams * priceThbGram, purchasePrice: cost, note };
+  } else if (type === 'gadget') {
+    const category       = document.getElementById('asset-gadget-category').value;
+    const purchaseDate   = document.getElementById('asset-gadget-date').value;
+    const purchasePrice  = parseFloat((document.getElementById('asset-gadget-price').value || '').replace(/,/g,'')) || 0;
+    const depreciationRate = parseFloat(document.getElementById('asset-gadget-rate').value) || 0;
+    const payment        = document.getElementById('asset-gadget-payment').value.trim();
+    const warrantyExpiry = document.getElementById('asset-gadget-warranty').value;
+    const store          = document.getElementById('asset-gadget-store').value.trim();
+    if (!purchasePrice) { alert('กรุณาใส่ราคาที่ซื้อ'); return; }
+    const currentValue = _calcGadgetCurrentValue(purchasePrice, purchaseDate, depreciationRate);
+    obj = { name, type, category, purchaseDate, purchasePrice, depreciationRate, currentValue, payment, warrantyExpiry, store, note };
   } else {
     const value    = parseFloat(document.getElementById('asset-value').value.replace(/,/g,'')) || 0;
     const purchase = parseFloat(document.getElementById('asset-purchase').value.replace(/,/g,'')) || 0;
