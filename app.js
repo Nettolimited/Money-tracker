@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '4.1';
+const APP_VERSION = '4.2';
 const CHANGELOG = [
+  { v: '4.2', date: '23 พ.ค. 68', note: '🔍 ค้นหากองทุนจากชื่อได้เลย ไม่ต้องรู้ Proj ID' },
   { v: '4.1', date: '23 พ.ค. 68', note: '📈 หุ้น US + 🥇 ทองคำ: ดึงราคา real-time จาก Yahoo Finance แปลง THB อัตโนมัติ' },
   { v: '4.0', date: '23 พ.ค. 68', note: '🤖 ดึง NAV กองทุนอัตโนมัติจาก SEC Thailand API + ปุ่ม อัพ NAV ทั้งหมด' },
   { v: '3.9', date: '23 พ.ค. 68', note: '💵 กองทุน: คำนวณมูลค่าจาก หน่วยลงทุน × NAV อัพเดท NAV ได้ตลอด' },
@@ -1659,6 +1660,49 @@ async function _fetchGoldPrice() {
   } catch(e) { statusEl.textContent = `❌ ${e.message}`; statusEl.style.color = '#e74c3c'; }
 }
 
+let _fundSearchTimer = null;
+function _onFundSearchInput() {
+  clearTimeout(_fundSearchTimer);
+  _fundSearchTimer = setTimeout(_searchFund, 600);
+}
+
+async function _searchFund() {
+  const q = document.getElementById('asset-fund-search').value.trim();
+  const resultsEl = document.getElementById('asset-fund-results');
+  if (q.length < 2) { resultsEl.style.display = 'none'; return; }
+
+  resultsEl.style.display = 'block';
+  resultsEl.innerHTML = '<div style="padding:10px;color:#9E9E9E;font-size:13px">⏳ กำลังค้นหา...</div>';
+
+  try {
+    const res  = await fetch(`/.netlify/functions/fund-search?q=${encodeURIComponent(q)}`);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'ค้นหาไม่ได้');
+    if (!json.length) {
+      resultsEl.innerHTML = '<div style="padding:10px;color:#9E9E9E;font-size:13px">ไม่พบกองทุน ลองพิมพ์ชื่ออื่น</div>';
+      return;
+    }
+    resultsEl.innerHTML = json.map(f => `
+      <div onclick="_selectFund('${f.proj_id}','${(f.abbr||'').replace(/'/g,'\\\'')}')"
+        style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;active:background:var(--bg)">
+        <div style="font-size:13px;font-weight:700">${f.abbr || ''}</div>
+        <div style="font-size:11px;color:#9E9E9E">${f.name_th || f.name_en || ''}</div>
+      </div>`).join('');
+  } catch (e) {
+    resultsEl.innerHTML = `<div style="padding:10px;color:#e74c3c;font-size:13px">❌ ${e.message}</div>`;
+  }
+}
+
+function _selectFund(projId, abbr) {
+  document.getElementById('asset-proj-id').value       = projId;
+  document.getElementById('asset-fund-search').value   = abbr;
+  document.getElementById('asset-fund-results').style.display = 'none';
+  if (!document.getElementById('asset-name').value) document.getElementById('asset-name').value = abbr;
+  const statusEl = document.getElementById('asset-nav-status');
+  statusEl.textContent = `✅ เลือกแล้ว: ${abbr} (${projId}) — กด 🔄 ดึง NAV`;
+  statusEl.style.color = '#2ecc71';
+}
+
 async function _fetchNavByProjId() {
   const projId = document.getElementById('asset-proj-id').value.trim();
   if (!projId) { alert('กรุณาใส่ SEC Proj ID ก่อน'); return; }
@@ -1765,8 +1809,9 @@ function openAssetModal(id) {
     document.getElementById('asset-type').value     = asset.type || 'other';
     document.getElementById('asset-note').value     = asset.note || '';
     if (asset.type === 'financial') {
-      document.getElementById('asset-proj-id').value = asset.projId || '';
-      document.getElementById('asset-units').value   = asset.units || '';
+      document.getElementById('asset-proj-id').value     = asset.projId || '';
+      document.getElementById('asset-fund-search').value = asset.name || '';
+      document.getElementById('asset-units').value       = asset.units || '';
       document.getElementById('asset-nav').value     = asset.nav || '';
       document.getElementById('asset-cost').value    = asset.purchasePrice || '';
       document.getElementById('asset-nav-status').textContent = asset.navDate ? `NAV ล่าสุด: ${asset.navDate}` : '';
@@ -1790,8 +1835,10 @@ function openAssetModal(id) {
     document.getElementById('asset-type').value       = 'property';
     document.getElementById('asset-value').value      = '';
     document.getElementById('asset-purchase').value   = '';
-    document.getElementById('asset-proj-id').value    = '';
-    document.getElementById('asset-units').value      = '';
+    document.getElementById('asset-proj-id').value      = '';
+    document.getElementById('asset-fund-search').value  = '';
+    document.getElementById('asset-fund-results').style.display = 'none';
+    document.getElementById('asset-units').value        = '';
     document.getElementById('asset-nav').value        = '';
     document.getElementById('asset-cost').value       = '';
     document.getElementById('asset-ticker').value     = '';

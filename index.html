@@ -384,11 +384,13 @@
 
     <!-- fields: กองทุนรวม SEC -->
     <div id="asset-fund-fields" style="display:none">
-      <label class="form-label" style="margin-top:10px">SEC Proj ID <span style="font-weight:400;color:#9E9E9E">(เช่น M0643_2555)</span></label>
+      <label class="form-label" style="margin-top:10px">ค้นหากองทุน</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="text" id="asset-proj-id" class="form-input" placeholder="M0000_0000" style="flex:1">
-        <button onclick="_fetchNavByProjId()" class="btn-secondary" style="white-space:nowrap;padding:10px 12px">🔄 ดึง NAV</button>
+        <input type="text" id="asset-fund-search" class="form-input" placeholder="เช่น SCBS&P500, กองทุนไทยพาณิชย์" style="flex:1" oninput="_onFundSearchInput()">
+        <button onclick="_searchFund()" class="btn-secondary" style="white-space:nowrap;padding:10px 12px">🔍 ค้นหา</button>
       </div>
+      <div id="asset-fund-results" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:180px;overflow-y:auto"></div>
+      <input type="hidden" id="asset-proj-id">
       <div id="asset-nav-status" style="font-size:12px;color:#9E9E9E;margin-top:4px"></div>
       <label class="form-label" style="margin-top:10px">จำนวนหน่วยลงทุน</label>
       <input type="text" inputmode="decimal" id="asset-units" class="form-input" placeholder="0.0000" oninput="_calcFundValue()">
