@@ -965,13 +965,11 @@ function _renderSalaryAllocation(entry) {
       <span style="font-weight:700">฿${amount.toLocaleString()}</span>
     </div>`;
 
-  let allocHtml = row('💸', 'ประจำรายเดือน', fixedMonthly) +
-    row('📅', 'เก็บรายปี', annualMonthly) +
-    row('🎯', 'เป้าหมาย', goalsMonthly);
-
-  if (installMonthly > 0) {
-    allocHtml += row('💳', 'ผ่อนชำระ', installMonthly);
-  }
+  let allocHtml = '';
+  if (fixedMonthly  > 0) allocHtml += row('💸', 'ประจำรายเดือน', fixedMonthly);
+  if (annualMonthly > 0) allocHtml += row('📅', 'เก็บรายปี', annualMonthly);
+  if (goalsMonthly  > 0) allocHtml += row('🎯', 'เป้าหมาย', goalsMonthly);
+  if (installMonthly > 0) allocHtml += row('💳', 'ผ่อนชำระ', installMonthly);
 
   customItems.forEach(item => {
     const vat = item.vat || 0;
