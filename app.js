@@ -912,7 +912,7 @@ function _calcAllocation() {
     return s + ((mLeft && remaining > 0) ? Math.ceil(remaining / mLeft) : 0);
   }, 0);
   const installMonthly = (data.installments || [])
-    .filter(i => i.paidMonths < i.totalMonths)
+    .filter(i => i.paidMonths < i.totalMonths && !i.prepaid)
     .reduce((s, i) => s + (i.amountPerMonth || 0), 0);
   return { fixedMonthly, annualMonthly, goalsMonthly, installMonthly };
 }
@@ -1432,17 +1432,23 @@ function renderInstalls() {
     container.innerHTML = '<div class="empty-state"><div class="emoji">💳</div><p>ยังไม่มีรายการผ่อน<br>กด "+ เพิ่มรายการผ่อน" ด้านล่าง</p></div>';
     return;
   }
-  const activeInstalls = installments.filter(i => i.paidMonths < i.totalMonths);
-  const monthlyTotal   = activeInstalls.reduce((s, i) => s + i.amountPerMonth, 0);
-  container.innerHTML  = `
-    <div class="install-summary">ผ่อนรวม/เดือน <strong>฿${fmt(monthlyTotal)}</strong></div>
+  const activeInstalls  = installments.filter(i => i.paidMonths < i.totalMonths);
+  const monthlyTotal    = activeInstalls.reduce((s, i) => s + i.amountPerMonth, 0);
+  const unpreparedTotal = activeInstalls.filter(i => !i.prepaid).reduce((s, i) => s + i.amountPerMonth, 0);
+  const preparedCount   = activeInstalls.filter(i => i.prepaid).length;
+  container.innerHTML   = `
+    <div class="install-summary">
+      ผ่อนรวม/เดือน <strong>฿${fmt(monthlyTotal)}</strong>
+      ${preparedCount ? `<span style="font-size:12px;color:#2ecc71;margin-left:8px">💰 เตรียมแล้ว ${preparedCount} รายการ · คงเหลือในแผน ฿${fmt(unpreparedTotal)}</span>` : ''}
+    </div>
     ${installments.map(inst => {
       const remaining      = Math.max(0, inst.totalMonths - inst.paidMonths);
       const totalRemaining = remaining * inst.amountPerMonth;
       const pct            = Math.round((inst.paidMonths / inst.totalMonths) * 100);
       const done           = remaining === 0;
+      const prepaid        = !!inst.prepaid;
       return `
-        <div class="install-card" onclick="openInstallEdit('${inst.id}')">
+        <div class="install-card${prepaid ? ' install-prepaid' : ''}" onclick="openInstallEdit('${inst.id}')">
           <div class="install-header">
             <span class="install-name">${inst.name}</span>
             <span class="install-monthly ${done ? 'install-done' : ''}">
@@ -1460,8 +1466,22 @@ function renderInstalls() {
           </div>
           ${inst.fullPrice ? `<div class="install-account" style="color:#9E9E9E">ราคาเต็ม ฿${fmt(inst.fullPrice)}${inst.interestRate ? ` +${inst.interestRate}% ดอกเบี้ย` : ''}</div>` : ''}
           ${inst.account ? `<div class="install-account">${inst.account}</div>` : ''}
+          ${!done ? `<div onclick="event.stopPropagation();toggleInstallPrepaid('${inst.id}')" class="install-prepaid-btn${prepaid ? ' active' : ''}">
+            ${prepaid ? '💰 เตรียมเงินแล้ว · ไม่นับในแผน' : '☐ เตรียมเงินแล้ว'}
+          </div>` : ''}
         </div>`;
     }).join('')}`;
+}
+
+function toggleInstallPrepaid(id) {
+  const data = getData();
+  const inst = data.installments.find(i => i.id === id);
+  if (!inst) return;
+  inst.prepaid = !inst.prepaid;
+  saveData(data);
+  renderInstalls();
+  // re-render salary allocation if on salary page
+  if (state.page === 'salary') _renderSalaryAllocation(_getCurrentSalaryEntry());
 }
 
 function _updateInstallCalc() {
