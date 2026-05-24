@@ -507,12 +507,13 @@ function navigate(page, dir) {
   document.getElementById('settings-back').style.display = page === 'settings' ? 'flex' : 'none';
   document.getElementById('settings-btn').style.display  = page === 'settings' ? 'none' : 'flex';
 
+  if (page !== 'assets') _stopAssetsAutoRefresh();
   if (page === 'dashboard') renderDashboard();
   if (page === 'add' && !state.editingId) resetForm();
   if (page === 'list')     renderList();
   if (page === 'charts')   renderReports();
   if (page === 'salary')   renderSalaryPage();
-  if (page === 'assets')   renderAssetsPage();
+  if (page === 'assets') { renderAssetsPage(); _startAssetsAutoRefresh(); }
   if (page === 'settings') renderSettings();
 }
 
@@ -1855,7 +1856,30 @@ async function _fetchNavByProjId() {
   }
 }
 
-async function _autoRefreshAllFundNavs() {
+let _assetsRefreshInterval = null;
+const REFRESH_INTERVAL_MS = 15 * 60 * 1000; // 15 นาที
+
+function _startAssetsAutoRefresh() {
+  // clear interval เก่าถ้ามี
+  if (_assetsRefreshInterval) clearInterval(_assetsRefreshInterval);
+
+  // refresh ทันทีถ้าผ่านมา > 15 นาที
+  const last = parseInt(localStorage.getItem('lastNavRefresh') || '0');
+  if (Date.now() - last > REFRESH_INTERVAL_MS) {
+    _autoRefreshAllFundNavs(true); // silent
+  }
+
+  // ตั้ง interval refresh ทุก 15 นาที
+  _assetsRefreshInterval = setInterval(() => {
+    if (state.page === 'assets') _autoRefreshAllFundNavs(true);
+  }, REFRESH_INTERVAL_MS);
+}
+
+function _stopAssetsAutoRefresh() {
+  if (_assetsRefreshInterval) { clearInterval(_assetsRefreshInterval); _assetsRefreshInterval = null; }
+}
+
+async function _autoRefreshAllFundNavs(silent = false) {
   const data = getData();
   const assets = data.assets || [];
   const toRefresh = assets.filter(a =>
@@ -1863,8 +1887,8 @@ async function _autoRefreshAllFundNavs() {
     (a.type === 'stock'     && a.ticker && a.shares) ||
     (a.type === 'gold'      && a.grams)
   );
-  if (!toRefresh.length) { showToast('ไม่มีสินทรัพย์ที่อัพเดทได้อัตโนมัติ'); return; }
-  showToast('⏳ กำลังอัพเดทราคา...');
+  if (!toRefresh.length) { if (!silent) showToast('ไม่มีสินทรัพย์ที่อัพเดทได้อัตโนมัติ'); return; }
+  if (!silent) showToast('⏳ กำลังอัพเดทราคา...');
   let updated = 0;
 
   for (const asset of toRefresh) {
@@ -1905,8 +1929,10 @@ async function _autoRefreshAllFundNavs() {
   }
 
   saveData(data);
+  localStorage.setItem('lastNavRefresh', Date.now().toString());
   renderAssetsPage();
-  showToast(`✅ อัพเดทราคาแล้ว ${updated} รายการ`);
+  if (!silent) showToast(`✅ อัพเดทราคาแล้ว ${updated} รายการ`);
+  else if (updated > 0) showToast(`🔄 ราคาอัพเดทแล้ว ${updated} รายการ`);
 }
 
 function _onAssetTypeChange() {
