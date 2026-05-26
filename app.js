@@ -1445,6 +1445,8 @@ function renderInstalls() {
       const pct            = Math.round((inst.paidMonths / inst.totalMonths) * 100);
       const done           = remaining === 0;
       const prepaid        = !!inst.prepaid;
+      const reserve        = inst.reserve || 0;
+      const reservePct     = totalRemaining > 0 ? Math.min(100, Math.round(reserve / totalRemaining * 100)) : 0;
       return `
         <div class="install-card${prepaid ? ' install-prepaid' : ''}" onclick="openInstallEdit('${inst.id}')">
           <div class="install-header">
@@ -1462,6 +1464,16 @@ function renderInstalls() {
             <span>${inst.paidMonths}/${inst.totalMonths} งวด (${pct}%)</span>
             ${done ? '<span class="install-done">เสร็จสิ้น 🎉</span>' : `<span style="color:#FF1744">เหลือ ฿${fmt(totalRemaining)} (${remaining} งวด)</span>`}
           </div>
+          ${!done && reserve > 0 ? `
+          <div style="margin-top:6px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#9E9E9E;margin-bottom:3px">
+              <span>💰 เก็บเผื่อแล้ว ฿${fmt(reserve)}</span>
+              <span style="color:${reserve >= totalRemaining ? '#2ecc71' : '#9E9E9E'}">${reservePct}%${reserve >= totalRemaining ? ' ✅ ครบ!' : ''}</span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px">
+              <div style="height:4px;width:${reservePct}%;background:#2ecc71;border-radius:2px;transition:width .3s"></div>
+            </div>
+          </div>` : ''}
           ${inst.fullPrice ? `<div class="install-account" style="color:#9E9E9E">ราคาเต็ม ฿${fmt(inst.fullPrice)}${inst.interestRate ? ` +${inst.interestRate}% ดอกเบี้ย` : ''}</div>` : ''}
           ${inst.account ? `<div class="install-account">${inst.account}</div>` : ''}
           ${!done ? `<div onclick="event.stopPropagation();toggleInstallPrepaid('${inst.id}')" class="install-prepaid-btn${prepaid ? ' active' : ''}">
@@ -1509,6 +1521,8 @@ function openInstallAdd() {
   document.getElementById('install-paid').value        = '0';
   document.getElementById('install-amount').value      = '';
   document.getElementById('install-note').value        = '';
+  _setVal('install-reserve', '');
+  _setText('install-reserve-hint', '');
   document.getElementById('install-calc-hint').style.display = 'none';
   document.getElementById('delete-install-btn').style.display = 'none';
   populateInstallAccount(null);
@@ -1528,6 +1542,13 @@ function openInstallEdit(id) {
   document.getElementById('install-paid').value        = inst.paidMonths;
   document.getElementById('install-amount').value      = inst.amountPerMonth;
   document.getElementById('install-note').value        = inst.note || '';
+  _setVal('install-reserve', inst.reserve || '');
+  const remaining = Math.max(0, inst.totalMonths - inst.paidMonths);
+  const totalRem  = remaining * inst.amountPerMonth;
+  const reserve   = inst.reserve || 0;
+  if (reserve > 0 && totalRem > 0) {
+    _setText('install-reserve-hint', `ครอบคลุม ${Math.floor(reserve / inst.amountPerMonth)} งวด · ขาดอีก ฿${Math.max(0, totalRem - reserve).toLocaleString()}`);
+  } else { _setText('install-reserve-hint', ''); }
   document.getElementById('install-calc-hint').style.display = 'none';
   document.getElementById('delete-install-btn').style.display = 'block';
   populateInstallAccount(inst.account);
@@ -1557,7 +1578,8 @@ function saveInstall() {
   if (!amount || amount <= 0)        { alert('กรุณาใส่ยอดต่องวด'); return; }
   if (paid > total)                  { alert('งวดที่ผ่อนแล้วมากกว่าจำนวนงวดทั้งหมด'); return; }
 
-  const obj = { name, totalMonths: total, paidMonths: paid, amountPerMonth: amount, account: acc, note, fullPrice, interestRate };
+  const reserve = parseFloat((document.getElementById('install-reserve')?.value || '').replace(/,/g,'')) || 0;
+  const obj = { name, totalMonths: total, paidMonths: paid, amountPerMonth: amount, account: acc, note, fullPrice, interestRate, reserve };
   const data = getData();
   if (state.editingInstallId) {
     const idx = data.installments.findIndex(i => i.id === state.editingInstallId);
