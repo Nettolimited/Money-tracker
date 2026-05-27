@@ -221,34 +221,31 @@ body {
 .form-input:focus { border-color: var(--primary); }
 
 /* ---- CATEGORY GRID ---- */
-.cat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.cat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
 .cat-btn {
   background: var(--bg); border: 2px solid transparent;
-  border-radius: 10px; padding: 10px 4px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  cursor: pointer; font-size: 11px; font-family: inherit; color: var(--text);
+  border-radius: 10px; padding: 7px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; font-size: 10px; font-family: inherit; color: var(--text);
 }
-.cat-btn .cat-emoji { font-size: 24px; line-height: 1; }
+.cat-btn .cat-emoji { font-size: 18px; line-height: 1; }
 .cat-btn.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 700; }
 .cat-btn:active { opacity: .75; }
 
-/* ---- ACCOUNT CHIPS ---- */
+/* ---- ACCOUNT CHIPS (grid wrap — ไม่ scroll) ---- */
 .account-chips {
-  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
-  scrollbar-width: none;
+  display: flex; flex-wrap: wrap; gap: 6px;
 }
-.account-chips::-webkit-scrollbar { display: none; }
 .account-chip {
-  padding: 8px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: white; font-size: 13px; font-weight: 600; cursor: pointer;
-  white-space: nowrap; font-family: inherit; color: var(--text-secondary);
-  flex-shrink: 0; transition: all .15s;
+  padding: 6px 12px; border-radius: 8px; border: 1.5px solid var(--border);
+  background: var(--bg); font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit; color: var(--text-secondary); transition: all .15s;
 }
 .account-chip.selected {
   background: var(--primary); color: white; border-color: var(--primary);
 }
 .account-chip:active { opacity: .8; }
-.chip-freq { display:inline-block; margin-left:5px; font-size:10px; font-weight:800; opacity:.55; }
+.chip-freq { display:inline-block; margin-left:4px; font-size:10px; font-weight:800; opacity:.55; }
 
 /* ---- BUTTONS ---- */
 .btn-primary {
