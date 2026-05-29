@@ -1,6 +1,6 @@
 // ===== VERSION =====
 
-const APP_VERSION = '5.4';
+const APP_VERSION = '5.6';
 const CHANGELOG = [
   { v: '4.8', date: '23 พ.ค. 68', note: '📱 ของมีค่า/อุปกรณ์: คำนวณเสื่อมอัตโนมัติ, วันหมดประกัน, ร้านเคลม, หมวดหมู่' },
   { v: '4.2', date: '23 พ.ค. 68', note: '🔍 ค้นหากองทุนจากชื่อได้เลย ไม่ต้องรู้ Proj ID' },
@@ -509,7 +509,7 @@ function navigate(page, dir) {
 
   if (page !== 'assets') _stopAssetsAutoRefresh();
   if (page === 'dashboard') renderDashboard();
-  if (page === 'add' && !state.editingId) resetForm();
+  if (page === 'add' && !state.editingId && state.shouldResetAddForm !== false) resetForm();
   if (page === 'list')     renderList();
   if (page === 'charts')   renderReports();
   if (page === 'salary')   renderSalaryPage();
@@ -644,6 +644,7 @@ function resetForm() {
   updateAccountChips();
   renderInstallDropdown();
   renderQuickChips();
+  state.shouldResetAddForm = false; // ไม่ reset อีกจนกว่าจะ save
 }
 
 function updateToggle() {
@@ -786,9 +787,9 @@ function saveTransaction() {
   saveData(data);
   state.editingId    = null;
   state.addInstallId = null;
+  state.shouldResetAddForm = true; // บันทึกแล้ว → ครั้งถัดไปที่ navigate มา ให้ reset
   removeSlip();
   navigate('add');
-  resetForm();
   document.getElementById('main').scrollTop = 0;
   window.scrollTo(0, 0);
   showToast('✓ บันทึกแล้ว!');
