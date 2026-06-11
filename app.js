@@ -777,15 +777,20 @@ async function _fetchForeignRate() {
 
   statusEl.textContent = 'กำลังดึงข้อมูลเรทเงิน...';
   try {
-    const res = await fetch(`https://api.frankfurter.app/${date}?from=${cur}&to=THB`);
-    if (!res.ok) throw new Error('API Error');
+    let res = await fetch(`https://api.frankfurter.app/${date}?from=${cur}&to=THB`);
+    if (!res.ok) {
+      if (res.status === 404) {
+        res = await fetch(`https://api.frankfurter.app/latest?from=${cur}&to=THB`);
+      }
+      if (!res.ok) throw new Error('API Error');
+    }
     const data = await res.json();
     if (data && data.rates && data.rates.THB) {
       document.getElementById('foreign-rate').value = data.rates.THB;
-      statusEl.textContent = `✅ อัพเดทเรทสำเร็จ (${date})`;
+      statusEl.textContent = `✅ อัพเดทเรทสำเร็จ (${data.date || date})`;
       _calcForeign();
     } else {
-      statusEl.textContent = '❌ ไม่พบข้อมูลเรทเงินนี้';
+      statusEl.textContent = '❌ ไม่พบข้อมูลเรทเงินนี้ (อาจไม่รองรับสกุลเงินนี้)';
     }
   } catch (e) {
     statusEl.textContent = '❌ ดึงเรทไม่สำเร็จ ลองพิมพ์เอาเอง';
