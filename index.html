@@ -145,7 +145,20 @@
             <div class="form-group">
               <label class="form-label">สกุลเงิน</label>
               <div style="display:flex;gap:6px;">
-                <input type="text" id="foreign-currency-code" class="form-input" placeholder="เช่น JPY, USD" style="text-transform:uppercase;flex:1">
+                <input type="text" id="foreign-currency-code" class="form-input" list="currency-list" placeholder="เช่น JPY, USD" style="text-transform:uppercase;flex:1">
+                <datalist id="currency-list">
+                  <option value="JPY">🇯🇵 ญี่ปุ่น (JPY)</option>
+                  <option value="KRW">🇰🇷 เกาหลีใต้ (KRW)</option>
+                  <option value="USD">🇺🇸 สหรัฐฯ (USD)</option>
+                  <option value="EUR">🇪🇺 ยุโรป (EUR)</option>
+                  <option value="GBP">🇬🇧 อังกฤษ (GBP)</option>
+                  <option value="SGD">🇸🇬 สิงคโปร์ (SGD)</option>
+                  <option value="HKD">🇭🇰 ฮ่องกง (HKD)</option>
+                  <option value="CNY">🇨🇳 จีน (CNY)</option>
+                  <option value="TWD">🇹🇼 ไต้หวัน (TWD)</option>
+                  <option value="AUD">🇦🇺 ออสเตรเลีย (AUD)</option>
+                  <option value="MYR">🇲🇾 มาเลเซีย (MYR)</option>
+                </datalist>
                 <button type="button" onclick="_fetchForeignRate()" class="btn-secondary" style="padding:0 10px;white-space:nowrap;">🔄 ดึงเรท</button>
               </div>
             </div>
