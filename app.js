@@ -775,18 +775,19 @@ async function _fetchForeignRate() {
   if (!cur) { statusEl.textContent = '❌ กรุณาใส่สกุลเงินก่อน'; return; }
   if (!date) { statusEl.textContent = '❌ กรุณาเลือกวันที่ก่อน'; return; }
 
+  const curLower = cur.toLowerCase();
   statusEl.textContent = 'กำลังดึงข้อมูลเรทเงิน...';
   try {
-    let res = await fetch(`https://api.frankfurter.app/${date}?from=${cur}&to=THB`);
+    let res = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${date}/v1/currencies/${curLower}.json`);
     if (!res.ok) {
-      if (res.status === 404) {
-        res = await fetch(`https://api.frankfurter.app/latest?from=${cur}&to=THB`);
+      if (res.status === 404 || res.status === 403) {
+        res = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${curLower}.json`);
       }
       if (!res.ok) throw new Error('API Error');
     }
     const data = await res.json();
-    if (data && data.rates && data.rates.THB) {
-      document.getElementById('foreign-rate').value = data.rates.THB;
+    if (data && data[curLower] && data[curLower].thb) {
+      document.getElementById('foreign-rate').value = data[curLower].thb;
       statusEl.textContent = `✅ อัพเดทเรทสำเร็จ (${data.date || date})`;
       _calcForeign();
     } else {
