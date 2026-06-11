@@ -137,6 +137,30 @@
         </div>
         <div id="form-amount-result" style="display:none;text-align:center;font-size:18px;font-weight:800;color:var(--primary);margin-bottom:8px"></div>
 
+        <div style="text-align:center;margin-bottom:16px;">
+          <button type="button" onclick="toggleForeignCurrency()" style="background:none;border:none;color:var(--primary);font-size:13px;font-weight:700;cursor:pointer;">🌍 ระบุเป็นเงินต่างประเทศ (ไม่บังคับ)</button>
+        </div>
+        <div id="foreign-currency-wrap" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group">
+              <label class="form-label">สกุลเงิน</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="foreign-currency-code" class="form-input" placeholder="เช่น JPY, USD" style="text-transform:uppercase;flex:1">
+                <button type="button" onclick="_fetchForeignRate()" class="btn-secondary" style="padding:0 10px;white-space:nowrap;">🔄 ดึงเรท</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ยอดต่างประเทศ</label>
+              <input type="text" inputmode="decimal" id="foreign-amount" class="form-input" placeholder="0.00" oninput="_calcForeign()">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">เรทเงิน (1 สกุลเงิน = กี่บาท)</label>
+            <input type="text" inputmode="decimal" id="foreign-rate" class="form-input" placeholder="0.00" oninput="_calcForeign()">
+          </div>
+          <div id="foreign-status" style="font-size:12px;color:#9E9E9E;margin-top:6px;text-align:center;"></div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">หมวดหมู่</label>
           <div id="cat-grid" class="cat-grid"></div>

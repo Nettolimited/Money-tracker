@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '5.6';
+const APP_VERSION = '5.7';
 const CHANGELOG = [
+  { v: '5.7', date: '11 มิ.ย. 69', note: '🌍 เพิ่มฟีเจอร์กรอกเงินต่างประเทศและดึงเรทย้อนหลังอัตโนมัติ' },
   { v: '4.8', date: '23 พ.ค. 68', note: '📱 ของมีค่า/อุปกรณ์: คำนวณเสื่อมอัตโนมัติ, วันหมดประกัน, ร้านเคลม, หมวดหมู่' },
   { v: '4.2', date: '23 พ.ค. 68', note: '🔍 ค้นหากองทุนจากชื่อได้เลย ไม่ต้องรู้ Proj ID' },
   { v: '4.1', date: '23 พ.ค. 68', note: '📈 หุ้น US + 🥇 ทองคำ: ดึงราคา real-time จาก Yahoo Finance แปลง THB อัตโนมัติ' },
@@ -613,6 +614,9 @@ function getCatEmoji(type, name) {
 function txHTML(t) {
   const emoji  = getCatEmoji(t.type, t.category);
   const parts  = [t.note, t.account].filter(Boolean);
+  if (t.foreignAmount && t.foreignCurrency) {
+    parts.unshift(`${t.foreignCurrency.toUpperCase()} ${fmt(t.foreignAmount)}`);
+  }
   const subText = parts.length ? parts.join(' · ') : fmtDate(t.date);
   const slipBadge = t.slipUrl ? '<span class="tx-slip-badge">📎</span>' : '';
   return `
@@ -637,6 +641,12 @@ function resetForm() {
   document.getElementById('form-amount').value = '';
   document.getElementById('form-date').value   = todayStr();
   document.getElementById('form-note').value   = '';
+  document.getElementById('foreign-currency-wrap').style.display = 'none';
+  document.getElementById('foreign-currency-code').value = '';
+  document.getElementById('foreign-amount').value = '';
+  document.getElementById('foreign-rate').value = '';
+  const statusEl = document.getElementById('foreign-status');
+  if (statusEl) statusEl.textContent = '';
   document.getElementById('delete-btn').style.display = 'none';
   removeSlip();
   updateToggle();
@@ -744,11 +754,58 @@ function _calcEval() {
   input.focus();
 }
 
+function toggleForeignCurrency() {
+  const wrap = document.getElementById('foreign-currency-wrap');
+  wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+}
+
+function _calcForeign() {
+  const fAmt = parseFloat(document.getElementById('foreign-amount').value) || 0;
+  const fRate = parseFloat(document.getElementById('foreign-rate').value) || 0;
+  if (fAmt > 0 && fRate > 0) {
+    document.getElementById('form-amount').value = (fAmt * fRate).toFixed(2);
+    _updateAmountCalc();
+  }
+}
+
+async function _fetchForeignRate() {
+  const cur = document.getElementById('foreign-currency-code').value.trim().toUpperCase();
+  const date = document.getElementById('form-date').value;
+  const statusEl = document.getElementById('foreign-status');
+  if (!cur) { statusEl.textContent = '❌ กรุณาใส่สกุลเงินก่อน'; return; }
+  if (!date) { statusEl.textContent = '❌ กรุณาเลือกวันที่ก่อน'; return; }
+
+  statusEl.textContent = 'กำลังดึงข้อมูลเรทเงิน...';
+  try {
+    const res = await fetch(`https://api.frankfurter.app/${date}?from=${cur}&to=THB`);
+    if (!res.ok) throw new Error('API Error');
+    const data = await res.json();
+    if (data && data.rates && data.rates.THB) {
+      document.getElementById('foreign-rate').value = data.rates.THB;
+      statusEl.textContent = `✅ อัพเดทเรทสำเร็จ (${date})`;
+      _calcForeign();
+    } else {
+      statusEl.textContent = '❌ ไม่พบข้อมูลเรทเงินนี้';
+    }
+  } catch (e) {
+    statusEl.textContent = '❌ ดึงเรทไม่สำเร็จ ลองพิมพ์เอาเอง';
+  }
+}
+
 function saveTransaction() {
   const rawAmt = document.getElementById('form-amount').value.replace(/,/g, '');
   const amount  = _safeCalc(rawAmt) ?? parseFloat(rawAmt);
   const date    = document.getElementById('form-date').value;
   const note    = document.getElementById('form-note').value.trim();
+
+  let foreignCurrency = '';
+  let foreignAmount = 0;
+  let foreignRate = 0;
+  if (document.getElementById('foreign-currency-wrap').style.display !== 'none') {
+    foreignCurrency = document.getElementById('foreign-currency-code').value.trim().toUpperCase();
+    foreignAmount = parseFloat(document.getElementById('foreign-amount').value) || 0;
+    foreignRate = parseFloat(document.getElementById('foreign-rate').value) || 0;
+  }
 
   if (!amount || amount <= 0) { alert('กรุณาใส่จำนวนเงินให้ถูกต้อง'); return; }
   if (!state.addCat)          { alert('กรุณาเลือกหมวดหมู่'); return; }
@@ -764,7 +821,8 @@ function saveTransaction() {
     if (idx !== -1) {
       data.transactions[idx] = {
         ...data.transactions[idx], type: state.addType, amount, category: state.addCat,
-        account: state.addAccount || '', date, note
+        account: state.addAccount || '', date, note,
+        foreignCurrency, foreignAmount, foreignRate
       };
       if (slipFile) _uploadSlipBackground(state.editingId, slipFile);
     }
@@ -772,7 +830,8 @@ function saveTransaction() {
     const txId = genId();
     data.transactions.push({
       id: txId, type: state.addType, amount, category: state.addCat,
-      account: state.addAccount || '', date, note, slipUrl: '', createdAt: Date.now()
+      account: state.addAccount || '', date, note, slipUrl: '', createdAt: Date.now(),
+      foreignCurrency, foreignAmount, foreignRate
     });
     if (slipFile) _uploadSlipBackground(txId, slipFile);
   }
@@ -820,6 +879,23 @@ function openEdit(id) {
   document.getElementById('form-amount').value = t.amount;
   document.getElementById('form-date').value   = t.date;
   document.getElementById('form-note').value   = t.note || '';
+  
+  if (t.foreignAmount && t.foreignCurrency) {
+    document.getElementById('foreign-currency-wrap').style.display = 'block';
+    document.getElementById('foreign-currency-code').value = t.foreignCurrency;
+    document.getElementById('foreign-amount').value = t.foreignAmount;
+    document.getElementById('foreign-rate').value = t.foreignRate || '';
+    const statusEl = document.getElementById('foreign-status');
+    if (statusEl) statusEl.textContent = '';
+  } else {
+    document.getElementById('foreign-currency-wrap').style.display = 'none';
+    document.getElementById('foreign-currency-code').value = '';
+    document.getElementById('foreign-amount').value = '';
+    document.getElementById('foreign-rate').value = '';
+    const statusEl = document.getElementById('foreign-status');
+    if (statusEl) statusEl.textContent = '';
+  }
+
   document.getElementById('delete-btn').style.display = 'block';
   removeSlip();
   if (t.slipUrl) {
