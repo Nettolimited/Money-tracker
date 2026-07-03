@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '5.7';
+const APP_VERSION = '5.8';
 const CHANGELOG = [
+  { v: '5.8', date: '3 ก.ค. 69', note: '🔍 ค้นหารายการข้ามเดือนได้แล้ว' },
   { v: '5.7', date: '11 มิ.ย. 69', note: '🌍 เพิ่มฟีเจอร์กรอกเงินต่างประเทศและดึงเรทย้อนหลังอัตโนมัติ' },
   { v: '4.8', date: '23 พ.ค. 68', note: '📱 ของมีค่า/อุปกรณ์: คำนวณเสื่อมอัตโนมัติ, วันหมดประกัน, ร้านเคลม, หมวดหมู่' },
   { v: '4.2', date: '23 พ.ค. 68', note: '🔍 ค้นหากองทุนจากชื่อได้เลย ไม่ต้องรู้ Proj ID' },
@@ -928,15 +929,26 @@ function deleteTransaction() {
 // ===== LIST PAGE =====
 
 function renderList() {
-  document.getElementById('list-month').textContent = monthLabel(state.listMonth, state.listYear);
   const { transactions } = getData();
   const { start: ls, end: le } = getMonthRange(state.listMonth, state.listYear);
-  let txs = transactions.filter(t => {
-    const d = new Date(t.date);
-    return d >= ls && d <= le;
-  });
+  const isSearching = !!state.listSearch;
+
+  let txs;
+  if (isSearching) {
+    // ค้นหาจากทุกเดือน
+    txs = transactions;
+    document.getElementById('list-month').textContent = '🔍 ค้นหาทุกเดือน';
+  } else {
+    // แสดงแค่เดือนที่เลือก
+    document.getElementById('list-month').textContent = monthLabel(state.listMonth, state.listYear);
+    txs = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d >= ls && d <= le;
+    });
+  }
+
   if (state.listFilter !== 'all') txs = txs.filter(t => t.type === state.listFilter);
-  if (state.listSearch) {
+  if (isSearching) {
     const q = state.listSearch.toLowerCase();
     txs = txs.filter(t =>
       t.category.toLowerCase().includes(q) ||
