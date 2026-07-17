@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '5.8';
+const APP_VERSION = '5.9';
 const CHANGELOG = [
+  { v: '5.9', date: '17 ก.ค. 69', note: '🔍 ค้นหาเพิ่มได้: ยอดเงิน, วันที่, สกุลเงินต่างประเทศ' },
   { v: '5.8', date: '3 ก.ค. 69', note: '🔍 ค้นหารายการข้ามเดือนได้แล้ว' },
   { v: '5.7', date: '11 มิ.ย. 69', note: '🌍 เพิ่มฟีเจอร์กรอกเงินต่างประเทศและดึงเรทย้อนหลังอัตโนมัติ' },
   { v: '4.8', date: '23 พ.ค. 68', note: '📱 ของมีค่า/อุปกรณ์: คำนวณเสื่อมอัตโนมัติ, วันหมดประกัน, ร้านเคลม, หมวดหมู่' },
@@ -953,7 +954,11 @@ function renderList() {
     txs = txs.filter(t =>
       t.category.toLowerCase().includes(q) ||
       (t.note    || '').toLowerCase().includes(q) ||
-      (t.account || '').toLowerCase().includes(q)
+      (t.account || '').toLowerCase().includes(q) ||
+      String(t.amount).includes(q) ||
+      (t.date || '').includes(q) ||
+      (t.foreignCurrency || '').toLowerCase().includes(q) ||
+      (t.type === 'income' ? 'รายรับ' : 'รายจ่าย').includes(q)
     );
   }
   txs.sort((a, b) => new Date(b.date) - new Date(a.date));
