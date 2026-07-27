@@ -1,7 +1,8 @@
 // ===== VERSION =====
 
-const APP_VERSION = '5.9';
+const APP_VERSION = '6.0';
 const CHANGELOG = [
+  { v: '6.0', date: '27 ก.ค. 69', note: '📅 หน้ารายงาน: แสดงยอดรายรับ/รายจ่ายในแต่ละวันใต้กราฟรายวัน' },
   { v: '5.9', date: '17 ก.ค. 69', note: '🔍 ค้นหาเพิ่มได้: ยอดเงิน, วันที่, สกุลเงินต่างประเทศ' },
   { v: '5.8', date: '3 ก.ค. 69', note: '🔍 ค้นหารายการข้ามเดือนได้แล้ว' },
   { v: '5.7', date: '11 มิ.ย. 69', note: '🌍 เพิ่มฟีเจอร์กรอกเงินต่างประเทศและดึงเรทย้อนหลังอัตโนมัติ' },
@@ -1441,6 +1442,55 @@ function renderDailyChart() {
       layout: { padding: { top: 8, bottom: 4 } }
     }
   });
+
+  // Render daily summary table below the chart
+  renderDailySummary(txs, allDays);
+}
+
+function renderDailySummary(txs, allDays) {
+  const container = document.getElementById('daily-summary-list');
+  if (!container) return;
+
+  // Build per-day income and expense totals
+  const byDayInc = {};
+  const byDayExp = {};
+  txs.forEach(t => {
+    const day = parseInt(t.date.split('-')[2]);
+    const dateStr = t.date;
+    if (!byDayInc[day]) { byDayInc[day] = 0; }
+    if (!byDayExp[day]) { byDayExp[day] = { total: 0, date: dateStr }; }
+    if (t.type === 'income') {
+      byDayInc[day] += t.amount;
+    } else {
+      byDayExp[day].total += t.amount;
+      byDayExp[day].date = dateStr;
+    }
+  });
+
+  const days = [...new Set(txs.map(t => parseInt(t.date.split('-')[2])))].sort((a, b) => b - a);
+
+  if (!days.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `
+    <div style="border-top:1px solid var(--border);margin-top:4px;">
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:6px 10px;padding:8px 4px 4px;font-size:11px;font-weight:700;color:#9E9E9E;text-transform:uppercase;letter-spacing:.5px;">
+        <span>วันที่</span><span style="text-align:right;color:#00C853">รายรับ</span><span style="text-align:right;color:#FF1744">รายจ่าย</span><span style="text-align:right">คงเหลือ</span>
+      </div>
+      ${days.map(day => {
+        const exp = (byDayExp[day] || {}).total || 0;
+        const inc = byDayInc[day] || 0;
+        const net = inc - exp;
+        const dateStr = (byDayExp[day] || {}).date || txs.find(t => parseInt(t.date.split('-')[2]) === day)?.date || '';
+        const label = dateStr ? fmtDate(dateStr) : `วันที่ ${day}`;
+        return `
+          <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:4px 10px;padding:8px 4px;border-top:1px solid var(--border);align-items:center;" onclick="_goListDay('${dateStr}')" style="cursor:pointer">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${label}</span>
+            <span style="text-align:right;font-size:13px;color:#00C853;font-weight:600">${inc > 0 ? '+฿' + fmt(inc) : '-'}</span>
+            <span style="text-align:right;font-size:13px;color:#FF1744;font-weight:600">${exp > 0 ? '-฿' + fmt(exp) : '-'}</span>
+            <span style="text-align:right;font-size:13px;font-weight:700;color:${net >= 0 ? '#00C853' : '#FF1744'}">${net >= 0 ? '+' : ''}฿${fmt(Math.abs(net))}</span>
+          </div>`;
+      }).join('')}
+    </div>`;
 }
 
 function renderPieChart() {
