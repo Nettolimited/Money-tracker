@@ -427,3 +427,17 @@ body {
 /* ---- FUEL LOG ---- */
 .fuel-card { cursor: pointer; transition: box-shadow .15s; }
 .fuel-card:active { box-shadow: 0 0 0 2px var(--primary); }
+
+/* Voice review uses native modal focus handling and scrolls on mobile keyboards. */
+#voice-dialog {
+  box-sizing: border-box; width: min(94vw, 560px); max-height: 90dvh;
+  overflow-y: auto; border: 1px solid var(--border); border-radius: 16px;
+  padding: 20px; background: var(--bg); color: var(--text);
+}
+#voice-dialog::backdrop { background: rgba(0,0,0,.55); }
+#voice-dialog p { line-height: 1.6; }
+#voice-dialog button { min-height: 44px; margin: 6px 0; }
+#voice-dialog label { display: block; margin-top: 10px; }
+#voice-dialog textarea { width: 100%; box-sizing: border-box; }
+.voice-row { min-width: 0; margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+#voice-confirm { width: 22px; height: 22px; vertical-align: middle; }

@@ -488,6 +488,7 @@ function navigate(page, dir) {
     const oi = PAGE_ORDER.indexOf(state.page), ni = PAGE_ORDER.indexOf(page);
     if (oi !== -1 && ni !== -1) dir = ni > oi ? 'left' : 'right';
   }
+  if (page !== 'add' && window.closeVoiceExpense) window.closeVoiceExpense();
   state.page = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'slide-from-right', 'slide-from-left'));
   const newEl = document.getElementById(`page-${page}`);
@@ -620,7 +621,8 @@ function txHTML(t) {
   if (t.foreignAmount && t.foreignCurrency) {
     parts.unshift(`${t.foreignCurrency.toUpperCase()} ${fmt(t.foreignAmount)}`);
   }
-  const subText = parts.length ? parts.join(' · ') : fmtDate(t.date);
+  const subText = (parts.length ? parts.join(' · ') : fmtDate(t.date))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const slipBadge = t.slipUrl ? '<span class="tx-slip-badge">📎</span>' : '';
   return `
     <div class="tx-item" onclick="openEdit('${t.id}')">
@@ -801,6 +803,33 @@ async function _fetchForeignRate() {
   }
 }
 
+// Shared creation path for manual and reviewed voice entries; saveData handles Firebase sync.
+function createTransaction(fields) {
+  return { id: genId(), slipUrl: '', createdAt: Date.now(),
+    foreignCurrency: '', foreignAmount: 0, foreignRate: 0, ...fields };
+}
+
+function saveVoiceExpenses(items, account, date) {
+  const data = getData();
+  if (!data.accounts.includes(account) || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) {
+    throw new Error('กรุณาเลือกบัญชีและวันที่');
+  }
+  if (!items.length || items.some(item => !item.itemName.trim() ||
+      !Number.isFinite(item.amount) || item.amount <= 0 ||
+      !data.categories.expense.some(c => c.name === item.category))) {
+    throw new Error('กรุณาตรวจชื่อรายการ ราคา และหมวดหมู่ทุกรายการ');
+  }
+  const transactions = items.map(item => createTransaction({
+    type: 'expense', amount: item.amount, category: item.category, account, date,
+    itemName: item.itemName.trim(), merchant: item.merchant.trim(),
+    note: [item.itemName.trim(), item.merchant.trim() ? 'ร้าน ' + item.merchant.trim() : ''].filter(Boolean).join(' · ')
+  }));
+  // One save, after validation of the entire batch. Existing transactions are retained.
+  saveData({ ...data, transactions: [...data.transactions, ...transactions] });
+  showToast('✓ บันทึกแล้ว ' + transactions.length + ' รายการ (ดูสถานะ Cloud ที่หัวแอป)');
+}
+
 function saveTransaction() {
   const rawAmt = document.getElementById('form-amount').value.replace(/,/g, '');
   const amount  = _safeCalc(rawAmt) ?? parseFloat(rawAmt);
@@ -837,11 +866,11 @@ function saveTransaction() {
     }
   } else {
     const txId = genId();
-    data.transactions.push({
+    data.transactions.push(createTransaction({
       id: txId, type: state.addType, amount, category: state.addCat,
       account: state.addAccount || '', date, note, slipUrl: '', createdAt: Date.now(),
       foreignCurrency, foreignAmount, foreignRate
-    });
+    }));
     if (slipFile) _uploadSlipBackground(txId, slipFile);
   }
 
