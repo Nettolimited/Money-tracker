@@ -81,3 +81,14 @@ test('Reject negative speech amounts and invalid dates; render names as text', (
   assert.ok(html.includes('&lt;img'));
   assert.ok(!html.includes('<img'));
 });
+
+test('Quick review uses local today and most recent valid account, with safe empty-history fallback', () => {
+  const {defaults} = require('../voice-expense.js');
+  const today = new Date(2026, 10, 9, 0, 5);
+  assert.deepEqual(defaults({accounts:['เงินสด','บัตร'],transactions:[
+    {account:'บัตร',createdAt:200}, {account:'เงินสด',createdAt:100}, {account:'ลบแล้ว',createdAt:300}
+  ]}, today), {account:'บัตร',date:'2026-11-09'});
+  assert.equal(defaults({accounts:['เงินสด'],transactions:[]},today).account,'เงินสด');
+  assert.equal(defaults({accounts:[],transactions:[]},today).account,'');
+  assert.equal(defaults({accounts:['เงินสด','บัตร'],transactions:[{account:'บัตร',date:'2026-11-09'},{account:'เงินสด',date:'2026-11-08'}]},today).account,'บัตร');
+});

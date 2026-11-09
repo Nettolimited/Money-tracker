@@ -5,7 +5,26 @@
   const dialog = el('dialog');
   let recognition = null, saving = false;
   function status(message) { el('status').textContent = message; }
-  function unconfirm() { el('confirm').checked = false; el('save').disabled = true; }
+  function readItems() {
+    return [...el('items').querySelectorAll('.voice-row')].map(row =>
+      Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input =>
+        [input.dataset.field, input.dataset.field === 'amount' ? (input.validity.valid ? Number(input.value) : NaN) : input.value])));
+  }
+  function refreshSummary() {
+    const items = readItems();
+    const total = items.reduce((sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : 0), 0);
+    const data = getData();
+    const valid = items.length && items.every(item => item.itemName.trim() && Number.isFinite(item.amount) && item.amount > 0 && data.categories.expense.some(c => c.name === item.category)) &&
+      data.accounts.includes(el('account').value) && el('date').value && el('date').validity.valid;
+    el('save').disabled = saving || !valid || el('review').hidden || !!recognition;
+    el('save').textContent = 'ยืนยันบันทึก ' + items.length + ' รายการ · ฿' + total.toLocaleString('th-TH', {maximumFractionDigits: 2});
+    el('summary').textContent = 'วันที่ ' + el('date').value + ' · บัญชี ' + (el('account').value || 'กรุณาเลือกบัญชี') + ' · รวม ฿' + total.toLocaleString('th-TH', {maximumFractionDigits: 2});
+    for (const row of el('items').querySelectorAll('.voice-row')) {
+      const value = key => row.querySelector('[data-field=' + key + ']').value;
+      row.querySelector('.voice-item-summary').textContent = [value('itemName') || 'กรุณาระบุชื่อ', '฿' + (value('amount') || '?'), value('category') || 'เลือกหมวดหมู่', value('merchant') ? 'ร้าน ' + value('merchant') : ''].filter(Boolean).join(' · ');
+    }
+  }
+  function unconfirm() { el('save').disabled = true; }
   function invalidate() { unconfirm(); el('review').hidden = true; el('items').replaceChildren(); }
   function stop() {
     const active = recognition;
@@ -61,7 +80,9 @@
     };
     active.onend = () => {
       if (recognition !== active) return;
-      stop(); status('หยุดฟังแล้ว ตรวจข้อความแล้วกดแยกรายการ หรือกดเริ่มพูดเพื่อเพิ่มข้อความ');
+      stop();
+      if (el('text').value.trim()) buildReview();
+      else status('ยังไม่มีข้อความ ลองพูดใหม่หรือใช้ไมค์แป้นพิมพ์');
     };
     try {
       active.start(); el('start').disabled = true; el('stop').disabled = false; el('parse').disabled = true;
@@ -70,7 +91,7 @@
   });
   // Gracefully finish the current utterance before reviewing final results.
   el('stop').addEventListener('click', () => {
-    if (recognition) { recognition.stop(); el('stop').disabled = true; status('กำลังประมวลผลเสียงสุดท้าย…'); }
+    if (recognition) { el('stop').disabled = true; status('กำลังประมวลผลเสียงสุดท้าย…'); recognition.stop(); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden && recognition) { stop(); status('หยุดไมค์เมื่อออกจากหน้าจอ กรุณาตรวจข้อความ'); } });
   function field(row, label, key, value, type = 'text') {
@@ -79,40 +100,46 @@
     if (type === 'number') { input.min = '0.01'; input.step = '0.01'; input.inputMode = 'decimal'; }
     wrapper.append(input); row.append(wrapper);
   }
-  el('parse').addEventListener('click', () => {
+  function buildReview() {
     stop(); invalidate();
     const data = getData();
     const items = VoiceExpense.parse(el('text').value, data.categories.expense);
     if (!items.length) { status('กรุณาพูดหรือพิมพ์รายการก่อน'); return; }
     el('account').replaceChildren(new Option('เลือกบัญชี / บัตร', ''), ...data.accounts.map(a => new Option(a, a)));
-    const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-    el('date').value = today.toISOString().slice(0, 10);
+    const defaults = VoiceExpense.defaults(data);
+    el('account').value = defaults.account;
+    el('date').value = defaults.date;
     for (const item of items) {
       const row = document.createElement('fieldset'); row.className = 'voice-row';
       const legend = document.createElement('legend'); legend.textContent = 'รายจ่าย'; row.append(legend);
-      field(row, 'ชื่อรายการ', 'itemName', item.itemName);
-      field(row, 'ราคา (บาท)', 'amount', item.amount, 'number');
-      field(row, 'ร้านค้า (ไม่บังคับ)', 'merchant', item.merchant);
+      const summary = document.createElement('p'); summary.className = 'voice-item-summary'; row.append(summary);
+      const details = document.createElement('details');
+      const edit = document.createElement('summary'); edit.textContent = 'แก้ไขรายละเอียด'; details.append(edit); row.append(details);
+      field(details, 'ชื่อรายการ', 'itemName', item.itemName);
+      field(details, 'ราคา (บาท)', 'amount', item.amount, 'number');
+      field(details, 'ร้านค้า (ไม่บังคับ)', 'merchant', item.merchant);
       const label = document.createElement('label'); label.textContent = 'หมวดหมู่';
       const select = document.createElement('select'); select.className = 'form-input'; select.dataset.field = 'category';
       select.append(new Option('เลือกหมวดหมู่', ''), ...data.categories.expense.map(c => new Option(c.name, c.name)));
-      select.value = item.category; label.append(select); row.append(label);
+      select.value = item.category; label.append(select); details.append(label);
+      if (!item.itemName || !item.amount || !item.category) details.open = true;
       if (item.warning) { const warning = document.createElement('p'); warning.textContent = item.warning; row.append(warning); }
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn-secondary'; remove.textContent = 'ลบรายการนี้';
-      remove.addEventListener('click', () => { row.remove(); unconfirm(); }); row.append(remove);
+      remove.addEventListener('click', () => { row.remove(); refreshSummary(); }); row.append(remove);
       el('items').append(row);
     }
-    el('review').hidden = false; status('แยกได้ ' + items.length + ' รายการ กรุณาตรวจสอบ');
-  });
-  el('review').addEventListener('input', event => { if (event.target !== el('confirm')) unconfirm(); });
-  el('confirm').addEventListener('change', () => { el('save').disabled = !el('confirm').checked || saving; });
+    el('review').hidden = false; refreshSummary();
+    status('เติมวันที่และบัญชีให้แล้ว ตรวจสรุปแล้วกดยืนยันได้เลย ร้านค้าเว้นว่างได้');
+  }
+  el('parse').addEventListener('click', buildReview);
+  el('review').addEventListener('input', refreshSummary);
+  el('review').addEventListener('change', refreshSummary);
   el('save').addEventListener('click', () => {
-    if (saving || !el('confirm').checked || el('review').hidden || recognition) return;
-    const rows = [...el('items').querySelectorAll('.voice-row')];
-    const items = rows.map(row => Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, input.dataset.field === 'amount' ? (input.validity.valid ? Number(input.value) : NaN) : input.value])));
+    if (saving || el('save').disabled || el('review').hidden || recognition || !dialog.open) return;
+    const items = readItems();
     saving = true; el('save').disabled = true;
     try { saveVoiceExpenses(items, el('account').value, el('date').value); close(); }
-    catch (error) { status(error.message); unconfirm(); }
-    finally { saving = false; }
+    catch (error) { status(error.message); }
+    finally { saving = false; if (dialog.open) refreshSummary(); }
   });
 })();

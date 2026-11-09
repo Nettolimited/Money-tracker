@@ -51,6 +51,17 @@
       return {itemName, amount, merchant, category, warning};
     });
   }
-  root.VoiceExpense = {parse, number};
+  function defaults(data, now = new Date()) {
+    const accounts = data.accounts || [];
+    let account = accounts[0] || '', latest = -Infinity;
+    for (const tx of data.transactions || []) {
+      if (!accounts.includes(tx.account)) continue;
+      const stamp = Number(tx.createdAt) || Date.parse(tx.date) || 0;
+      if (stamp >= latest) { latest = stamp; account = tx.account; }
+    }
+    const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+    return {account, date};
+  }
+  root.VoiceExpense = {parse, number, defaults};
   if (typeof module !== 'undefined') module.exports = root.VoiceExpense;
 })(typeof window === 'undefined' ? globalThis : window);

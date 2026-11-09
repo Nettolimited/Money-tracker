@@ -1224,13 +1224,15 @@
   <button type="button" id="voice-parse" class="btn-secondary">แยกรายการเพื่อตรวจสอบ</button>
   <div id="voice-review" hidden>
     <p>ตรวจสอบทุกรายการ หมวดหมู่เป็นเพียงคำแนะนำ รายการจะบันทึกเป็นรายจ่ายเงินบาท</p>
+    <p id="voice-summary" role="status" aria-live="polite"></p>
+    <details><summary>เปลี่ยนวันที่ / บัญชี</summary>
     <label for="voice-account">บัญชี / บัตรสำหรับชุดนี้</label>
     <select id="voice-account" class="form-input"></select>
     <label for="voice-date">วันที่สำหรับชุดนี้</label>
     <input id="voice-date" type="date" class="form-input">
+    </details>
     <div id="voice-items"></div>
-    <label><input id="voice-confirm" type="checkbox"> ตรวจสอบทุกรายการแล้ว ยืนยันบันทึก</label>
-    <button type="button" id="voice-save" class="btn-primary" disabled>บันทึกรายจ่ายที่ตรวจแล้ว</button>
+    <button type="button" id="voice-save" class="btn-primary" disabled>ยืนยันบันทึก</button>
   </div>
   <button type="button" id="voice-cancel" class="btn-secondary">ปิด / ยกเลิก</button>
 </dialog>
