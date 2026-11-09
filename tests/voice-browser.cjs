@@ -76,6 +76,53 @@ const root = path.resolve(__dirname, '..');
   assert.equal(await page.evaluate(() => _writes.length), 1);
   assert.equal(await page.locator('[data-field=amount]').inputValue(), '60');
   await page.locator('#voice-cancel').click();
+  // Reproduce Android repeated/revised final snapshots (including resultIndex=0).
+  await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => {
+    const emit = parts => _speech.onresult({resultIndex:0, results:parts.map(([text, final]) => {
+      const result=[{transcript:text}];result.isFinal=final;return result;
+    })});
+    emit([['ข้าวหมูกรอบ', false]]);
+    emit([['ข้าวหมูกรอบ 50', true]]);
+    for(let i=0;i<6;i++) emit([['ข้าวหมูกรอบ 50',true]]);
+    emit([['ข้าวหมูกรอบ 50 บาท ร้านไข่เจียวฟู',true]]);
+    emit([['ข้าวหมูกรอบ 50 บาท ร้านไข่เจียวฟู',true],['แล้ว กาแฟ',false]]);
+  });
+  assert.equal(await page.locator('#voice-text').inputValue(), 'ข้าวหมูกรอบ 50 บาท ร้านไข่เจียวฟู');
+  await page.locator('#voice-stop').click();
+  assert.equal(await page.locator('.voice-row').count(), 1);
+  assert.equal(await page.locator('[data-field=amount]').inputValue(), '50');
+  assert.equal(await page.evaluate(() => _writes.length), 1);
+  // Start a second session: keep the first session once and add a distinct slot.
+  await page.locator('#voice-start').click();
+  await page.evaluate(() => {
+    const r=[{transcript:'แล้ว กาแฟ 55 บาท'}];r.isFinal=true;
+    _speech.onresult({resultIndex:0,results:[r]});
+    _speech.onresult({resultIndex:0,results:[r]});
+  });
+  assert.equal(await page.locator('#voice-text').inputValue(), 'ข้าวหมูกรอบ 50 บาท ร้านไข่เจียวฟู แล้ว กาแฟ 55 บาท');
+  await page.locator('#voice-stop').click();
+  assert.equal(await page.locator('.voice-row').count(), 2);
+  await page.locator('#voice-cancel').click();
+  // Identical utterances in different result slots are intentional, not duplicates.
+  await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => {
+    const parts=['ข้าว 50 บาท','แล้ว ข้าว 50 บาท'].map(transcript=>{const r=[{transcript}];r.isFinal=true;return r;});
+    _speech.onresult({resultIndex:0,results:parts});
+    _speech.onresult({resultIndex:1,results:parts});
+  });
+  await page.locator('#voice-stop').click();
+  assert.equal(await page.locator('.voice-row').count(), 2);
+  assert.match(await page.locator('#voice-save').textContent(), /100/);
+  await page.locator('#voice-cancel').click();
+  // Manual edits stop recognition, and callbacks captured before cancellation are stale.
+  await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => { window._lateResult=_speech.onresult; });
+  await page.locator('#voice-text').fill('ข้าว 70 บาท');
+  await page.evaluate(() => {const r=[{transcript:'stale text'}];r.isFinal=true;_lateResult({resultIndex:0,results:[r]});});
+  assert.equal(await page.locator('#voice-text').inputValue(), 'ข้าว 70 บาท');
+  assert.equal(await page.locator('#voice-start').isEnabled(), true);
+  await page.locator('#voice-cancel').click();
   await open(); await page.locator('#voice-start').click();
   await page.evaluate(() => _speech.onerror({error:'not-allowed'}));
   assert.match(await page.locator('#voice-status').textContent(), /อนุญาต/);
@@ -83,6 +130,6 @@ const root = path.resolve(__dirname, '..');
   assert.equal(await page.evaluate(() => _aborted), true);
   assert.equal(await page.evaluate(() => _writes.length), 1);
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
-  console.log('PASS: mobile review, automatic date/account, single confirmation, invalid price lock, live summary, mock Firebase batch, duplicate click, cancel, transcript edit, Thai speech, denied microphone, Escape; zero external requests.');
+  console.log('PASS: mobile review, automatic date/account, single confirmation, invalid price lock, live summary, mock Firebase batch, duplicate click, cancel, transcript edit, Thai speech, repeated/revised Android snapshots, session restart, intentional repeated items, stale events, denied microphone, Escape; zero external requests.');
   await browser.close();
 })().catch(error => {console.error(error);process.exit(1);});

@@ -46,7 +46,10 @@
   el('cancel').addEventListener('click', close);
   dialog.addEventListener('cancel', e => { e.preventDefault(); close(); });
   dialog.addEventListener('close', () => { stop(); invalidate(); el('text').value = ''; });
-  el('text').addEventListener('input', invalidate);
+  el('text').addEventListener('input', () => {
+    if (recognition) { stop(); status('หยุดไมค์เพื่อให้แก้ข้อความได้'); }
+    invalidate();
+  });
   el('start').addEventListener('click', () => {
     const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Speech || !window.isSecureContext) {
@@ -54,17 +57,23 @@
       return;
     }
     stop(); invalidate();
+    const baseText = el('text').value.trim();
     const active = new Speech(); recognition = active;
     active.lang = 'th-TH'; active.continuous = true; active.interimResults = true;
     active.onresult = event => {
       if (recognition !== active || !dialog.open) return;
+      // Android may resend or revise the same final result. Rebuild from the
+      // current session snapshot instead of appending each event to the textarea.
+      // Do not deduplicate by text: two genuinely spoken identical items are valid.
+      const finalParts = [];
       let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          el('text').value = [el('text').value.trim(), event.results[i][0].transcript.trim()].filter(Boolean).join(' ');
-          invalidate();
-        } else interim += event.results[i][0].transcript;
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) finalParts.push(result[0].transcript.trim());
+        else interim += result[0].transcript;
       }
+      const text = [baseText, ...finalParts].filter(Boolean).join(' ');
+      if (el('text').value !== text) { el('text').value = text; invalidate(); }
       status(interim ? 'กำลังฟัง: ' + interim : 'กำลังฟัง… กดหยุดฟังก่อนแยกรายการ');
     };
     active.onerror = event => {
