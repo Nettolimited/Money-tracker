@@ -7,13 +7,13 @@
   if (!dialog || dialog.dataset.voiceEntryBound === 'true') return;
   dialog.dataset.voiceEntryBound = 'true';
   let recognition = null, stopping = false, saving = false;
-  const BUILD = '2026-11-10.5';
+  const BUILD = '2026-11-10.5.1';
   let diagnostics = [];
   function record(type, detail = {}) {
     diagnostics.push({type, ...detail}); diagnostics = diagnostics.slice(-20);
     if (el('diagnostics')) el('diagnostics').value = JSON.stringify({build:BUILD, continuous:false, events:diagnostics}, null, 2);
   }
-  if (el('version')) el('version').textContent = 'รุ่น 5 · ฟังทีละรอบ · หยุดอัตโนมัติ';
+  if (el('version')) el('version').textContent = 'รุ่น 5.1 · ฟังทีละรอบ · หยุดอัตโนมัติ';
   el('copy-diagnostics')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(el('diagnostics').value); status('คัดลอกข้อมูลตรวจปัญหาแล้ว ส่งให้ผู้ช่วยได้หากต้องการ'); }
     catch (_) { el('diagnostics').focus(); el('diagnostics').select(); status('เลือกข้อมูลแล้ว กดคัดลอกเพื่อส่งตรวจปัญหาได้'); }

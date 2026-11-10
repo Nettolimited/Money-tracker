@@ -92,3 +92,15 @@ test('Quick review uses local today and most recent valid account, with safe emp
   assert.equal(defaults({accounts:[],transactions:[]},today).account,'');
   assert.equal(defaults({accounts:['เงินสด','บัตร'],transactions:[{account:'บัตร',date:'2026-11-09'},{account:'เงินสด',date:'2026-11-08'}]},today).account,'บัตร');
 });
+
+test('Smoothies and Amazon drinks suggest the existing drink category', () => {
+  for (const name of ['น้ำปั่น','ผลไม้ปั่น','น้ำผลไม้','สมูทตี้','โกโก้','น้ำอเมซอน','น้ำอะเมซอน','น้ำ อเมซอน','น้ำ Amazon','น้ำ ร้านอเมซอน','เครื่องดื่ม ร้านอะเมซอน']) {
+    assert.equal(parse(name+' 50 บาท', categories)[0].category, 'กาแฟ/น้ำหวาน', name);
+  }
+  assert.equal(parse('น้ำปั่น 50 บาท หมวดอื่นๆ',categories)[0].category,'อื่นๆ');
+  assert.equal(parse('น้ำปั่น 50 บาท',['อาหาร','อื่นๆ'])[0].category,'');
+  assert.equal(parse('น้ำมัน 500 บาท',['BRV','กาแฟ/น้ำหวาน'])[0].category,'BRV');
+  assert.equal(parse('แก้วน้ำอเมซอน 100 บาท',categories)[0].category,'');
+  assert.equal(parse('ข้าว 50 บาท ร้านอเมซอน',categories)[0].category,'อาหาร');
+  assert.equal(parse('น้ำปลา 30 บาท',categories)[0].category,'');
+});

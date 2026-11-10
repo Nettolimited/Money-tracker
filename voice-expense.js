@@ -45,8 +45,17 @@
       if (shop) { merchant = shop[1].trim(); rest = rest.slice(0, shop.index); }
       const itemName = rest.replace(/(?:ราคา|จำนวน)\s*$/, '').trim();
       if (!explicit) {
-        const rules = [ [/กาแฟ|ชาเย็น|ชาไทย|น้ำหวาน|ชานม/, 'กาแฟ/น้ำหวาน'], [/ข้าว|อาหาร|ก๋วยเตี๋ยว|ขนม/, 'อาหาร'], [/แท็กซี่|รถไฟ|รถเมล์|เดินทาง/, 'เดินทาง'], [/น้ำมัน/, 'BRV'], [/ยา|หมอ|โรงพยาบาล/, 'สุขภาพ'] ];
-        category = (rules.find(([r, n]) => r.test(itemName) && names.includes(n)) || [null, ''])[1];
+        const drinks = /กาแฟ|ชาเย็น|ชาไทย|น้ำหวาน|ชานม|น้ำปั่น|ผลไม้ปั่น|น้ำผลไม้|สมูทตี้|สมูทที|โกโก้|โอเลี้ยง|^(?:น้ำ|เครื่องดื่ม)\s*(?:คาเฟ่\s*)?(?:อเมซอน|อะเมซอน|amazon)/i;
+        const cafeDrink = /^(?:น้ำ|เครื่องดื่ม|น้ำดื่ม|น้ำเปล่า)$/.test(itemName) && /อเมซอน|อะเมซอน|amazon/i.test(merchant);
+        const rules = [
+          [/น้ำมัน/, 'BRV'],
+          [drinks, 'กาแฟ/น้ำหวาน'],
+          [/ข้าว|อาหาร|ก๋วยเตี๋ยว|ขนม/, 'อาหาร'],
+          [/แท็กซี่|รถไฟ|รถเมล์|เดินทาง/, 'เดินทาง'],
+          [/ยา|หมอ|โรงพยาบาล/, 'สุขภาพ']
+        ];
+        category = cafeDrink && names.includes('กาแฟ/น้ำหวาน') ? 'กาแฟ/น้ำหวาน' :
+          (rules.find(([r, n]) => r.test(itemName) && names.includes(n)) || [null, ''])[1];
       }
       return {itemName, amount, merchant, category, warning};
     });

@@ -1,4 +1,4 @@
-const CACHE = 'finance-v67';
+const CACHE = 'finance-v68';
 const FILES = ['./index.html', './style.css', './app.js', './voice-expense.js', './voice-entry.js', './speech-transcript.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
