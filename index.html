@@ -1214,6 +1214,7 @@
 
 <dialog id="voice-dialog" aria-labelledby="voice-title">
   <h2 id="voice-title">🎙️ เพิ่มรายจ่ายด้วยเสียง</h2>
+  <p id="voice-version">กำลังโหลดระบบเสียง…</p>
   <p>พูด เช่น “ข้าว 60 บาท ร้านป้าดา แล้ว กาแฟ 55 บาท ร้านอเมซอน” ใช้ “แล้ว” หรือขึ้นบรรทัดใหม่เพื่อแยกรายการ</p>
   <p>ใช้เสียงภาษาไทยของเบราว์เซอร์ อาจส่งเสียงไปยังผู้ให้บริการและต้องใช้อินเทอร์เน็ต ไม่มี AI API แบบเสียเงินที่ต้องสมัครเพิ่ม</p>
   <button type="button" id="voice-start" class="btn-secondary">เริ่มพูด</button>
@@ -1234,6 +1235,11 @@
     <div id="voice-items"></div>
     <button type="button" id="voice-save" class="btn-primary" disabled>ยืนยันบันทึก</button>
   </div>
+  <details><summary>ตรวจสอบปัญหาเสียง</summary>
+    <p>ข้อมูลนี้อยู่ในหน้านี้เท่านั้น ไม่ส่งออกอัตโนมัติ คัดลอกส่งผู้ช่วยได้เมื่อมีปัญหา (มีข้อความที่พูด)</p>
+    <textarea id="voice-diagnostics" class="form-input" rows="6" readonly aria-label="ข้อมูลตรวจปัญหาเสียง"></textarea>
+    <button type="button" id="voice-copy-diagnostics" class="btn-secondary">คัดลอกข้อมูลตรวจปัญหา</button>
+  </details>
   <button type="button" id="voice-cancel" class="btn-secondary">ปิด / ยกเลิก</button>
 </dialog>
 <script src="voice-expense.js"></script>

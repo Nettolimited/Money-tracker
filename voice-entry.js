@@ -7,6 +7,17 @@
   if (!dialog || dialog.dataset.voiceEntryBound === 'true') return;
   dialog.dataset.voiceEntryBound = 'true';
   let recognition = null, stopping = false, saving = false;
+  const BUILD = '2026-11-10.5';
+  let diagnostics = [];
+  function record(type, detail = {}) {
+    diagnostics.push({type, ...detail}); diagnostics = diagnostics.slice(-20);
+    if (el('diagnostics')) el('diagnostics').value = JSON.stringify({build:BUILD, continuous:false, events:diagnostics}, null, 2);
+  }
+  if (el('version')) el('version').textContent = 'รุ่น 5 · ฟังทีละรอบ · หยุดอัตโนมัติ';
+  el('copy-diagnostics')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(el('diagnostics').value); status('คัดลอกข้อมูลตรวจปัญหาแล้ว ส่งให้ผู้ช่วยได้หากต้องการ'); }
+    catch (_) { el('diagnostics').focus(); el('diagnostics').select(); status('เลือกข้อมูลแล้ว กดคัดลอกเพื่อส่งตรวจปัญหาได้'); }
+  });
   function status(message) { el('status').textContent = message; }
   function readItems() {
     return [...el('items').querySelectorAll('.voice-row')].map(row =>
@@ -33,7 +44,7 @@
     const active = recognition;
     recognition = null; stopping = false;
     if (active) {
-      active.onresult = active.onerror = active.onend = null;
+      active.onresult = active.onerror = active.onend = active.onspeechend = null;
       if (abort) active.abort();
     }
     el('start').disabled = false;
@@ -42,6 +53,7 @@
   }
   function close() {
     stop(); invalidate(); el('text').value = ''; status('');
+    diagnostics = []; if (el('diagnostics')) el('diagnostics').value = '';
     if (dialog.open) dialog.close();
   }
   window.closeVoiceExpense = close;
@@ -67,9 +79,12 @@
     const baseText = el('text').value.trim();
     const transcript = SpeechTranscript.createSession();
     const active = new Speech(); recognition = active;
-    active.lang = 'th-TH'; active.continuous = true; active.interimResults = true;
+    active.lang = 'th-TH'; active.continuous = false; active.interimResults = true;
+    record('start');
+    active.onspeechend = () => { if (recognition === active) { record('speechend'); requestStop(); } };
     active.onresult = event => {
       if (recognition !== active || !dialog.open) return;
+      record('result', {resultIndex:event.resultIndex, results:Array.from(event.results, result => ({isFinal:result.isFinal, text:result[0]?.transcript || ''}))});
       const { finalTranscript, interimTranscript } = transcript.update(event);
       const text = [baseText, finalTranscript].filter(Boolean).join(' ');
       if (el('text').value !== text) { el('text').value = text; invalidate(); }
@@ -78,6 +93,7 @@
     };
     active.onerror = event => {
       if (recognition !== active || !dialog.open) return;
+      record('error', {error:event.error});
       stop();
       const messages = {
         'not-allowed': 'ไม่ได้รับอนุญาตใช้ไมค์ กรุณาเปิดสิทธิ์ไมค์หรือใช้ไมค์บนแป้นพิมพ์',
@@ -90,6 +106,7 @@
     };
     active.onend = () => {
       if (recognition !== active) return;
+      record('end');
       const { finalTranscript } = transcript.finish();
       el('text').value = [baseText, finalTranscript].filter(Boolean).join(' ');
       stop(false);
@@ -98,13 +115,14 @@
     };
     try {
       active.start(); el('start').disabled = true; el('stop').disabled = false; el('parse').disabled = true;
-      status('กำลังฟังภาษาไทย…');
+      status('กำลังฟังภาษาไทย… พูดแล้วเว้นจังหวะ ระบบจะหยุดและสรุปให้');
     } catch (_) { stop(); status('เปิดไมค์ไม่ได้ ลองใหม่หรือใช้ไมค์บนแป้นพิมพ์'); }
   });
   // Gracefully finish the current utterance before reviewing final results.
-  el('stop').addEventListener('click', () => {
-    if (recognition && !stopping) { stopping = true; el('stop').disabled = true; status('กำลังประมวลผลเสียงสุดท้าย…'); recognition.stop(); }
-  });
+  function requestStop() {
+    if (recognition && !stopping) { stopping = true; record('stop'); el('stop').disabled = true; status('กำลังประมวลผลเสียงสุดท้าย…'); recognition.stop(); }
+  }
+  el('stop').addEventListener('click', requestStop);
   document.addEventListener('visibilitychange', () => { if (document.hidden && recognition) { stop(); status('หยุดไมค์เมื่อออกจากหน้าจอ กรุณาตรวจข้อความ'); } });
   function field(row, label, key, value, type = 'text') {
     const wrapper = document.createElement('label'); wrapper.textContent = label;
