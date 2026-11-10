@@ -12,9 +12,9 @@ const root = path.resolve(__dirname, '..');
     const url = new URL(route.request().url());
     if (url.origin !== 'http://localhost:4173') {external.push(url.href); return route.abort();}
     const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    if (!['index.html','app.js','voice-expense.js','voice-entry.js','style.css','icon.svg','manifest.json'].includes(file)) return route.abort();
+    if (!['index.html','app.js','voice-expense.js','voice-entry.js','speech-transcript.js','style.css','icon.svg','manifest.json'].includes(file)) return route.abort();
     let body = fs.readFileSync(path.join(root, file), 'utf8');
-    if (file === 'index.html') body = body.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, script => /src="(?:app|voice-expense|voice-entry)\.js"/.test(script) ? script : '');
+    if (file === 'index.html') body = body.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, script => /src="(?:app|voice-expense|voice-entry|speech-transcript)\.js"/.test(script) ? script : '');
     await route.fulfill({body, contentType:file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html'});
   });
   await context.addInitScript(() => {
@@ -62,11 +62,14 @@ const root = path.resolve(__dirname, '..');
   // Simulated Thai speech events exercise lifecycle without accessing a microphone.
   await page.evaluate(() => {
     window.SpeechRecognition = class {
-      constructor(){window._speech=this;}
+      constructor(){window._speech=this;window._speechCount=(window._speechCount||0)+1;}
       start(){} stop(){this.onend?.();} abort(){window._aborted=true;}
     };
   });
+  await page.addScriptTag({url:'http://localhost:4173/voice-entry.js'});
   await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => { document.getElementById('voice-start').dispatchEvent(new Event('click')); });
+  assert.equal(await page.evaluate(() => _speechCount), 1);
   assert.equal(await page.evaluate(() => _speech.lang), 'th-TH');
   await page.evaluate(() => {const r=[{transcript:'ข้าวหกสิบบาท ร้านป้าดา'}];r.isFinal=true;_speech.onresult({resultIndex:0,results:[r]});});
   assert.match(await page.locator('#voice-text').inputValue(), /หกสิบ/);
@@ -124,12 +127,39 @@ const root = path.resolve(__dirname, '..');
   assert.equal(await page.locator('#voice-start').isEnabled(), true);
   await page.locator('#voice-cancel').click();
   await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => {
+    window._stopCalls=0;
+    _speech.stop=()=>{window._stopCalls++;};
+    const r=[{transcript:'ข้าวหมูกรอบ'}];r.isFinal=false;
+    _speech.onresult({resultIndex:0,results:[r]});
+  });
+  assert.equal(await page.locator('#voice-text').inputValue(), '');
+  assert.match(await page.locator('#voice-status').textContent(), /ยังไม่ยืนยัน/);
+  await page.locator('#voice-stop').click();
+  await page.evaluate(() => document.getElementById('voice-stop').dispatchEvent(new Event('click')));
+  assert.equal(await page.evaluate(() => _stopCalls), 1);
+  assert.equal(await page.locator('#voice-review').isHidden(), true);
+  await page.evaluate(() => {
+    window._lateError=_speech.onerror;
+    const final=[{transcript:'ข้าวหมูกรอบ 50 บาท'}];final.isFinal=true;
+    _speech.onresult({resultIndex:0,results:[final]});
+    const end=_speech.onend;end();end();
+  });
+  assert.equal(await page.locator('#voice-text').inputValue(), 'ข้าวหมูกรอบ 50 บาท');
+  assert.equal(await page.locator('.voice-row').count(), 1);
+  assert.equal(await page.evaluate(() => _writes.length), 1);
+  await page.locator('#voice-save').click();
+  await page.evaluate(() => document.getElementById('voice-save').dispatchEvent(new Event('click')));
+  assert.equal(await page.evaluate(() => _writes.length), 2);
+  await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => _lateError({error:'network'}));
+  assert.equal(await page.locator('#voice-start').isDisabled(), true);
   await page.evaluate(() => _speech.onerror({error:'not-allowed'}));
   assert.match(await page.locator('#voice-status').textContent(), /อนุญาต/);
   await page.locator('#voice-start').click(); await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(() => _aborted), true);
-  assert.equal(await page.evaluate(() => _writes.length), 1);
+  assert.equal(await page.evaluate(() => _writes.length), 2);
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
-  console.log('PASS: mobile review, automatic date/account, single confirmation, invalid price lock, live summary, mock Firebase batch, duplicate click, cancel, transcript edit, Thai speech, repeated/revised Android snapshots, session restart, intentional repeated items, stale events, denied microphone, Escape; zero external requests.');
+  console.log('PASS: mobile review, automatic date/account, single confirmation, invalid price lock, live summary, mock Firebase batch, duplicate click, cancel, transcript edit, Thai speech, repeated/revised Android snapshots, session restart, intentional repeated items, stale events, duplicate initialization/start/stop/end/save, final after stop, denied microphone, Escape; zero external requests.');
   await browser.close();
 })().catch(error => {console.error(error);process.exit(1);});

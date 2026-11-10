@@ -19,7 +19,7 @@
 ## Tests
 
 ```sh
-node --test tests/voice-expense.test.cjs
+node --test tests/voice-expense.test.cjs tests/speech-transcript.test.cjs
 node tests/voice-browser.cjs
 ```
 
@@ -34,3 +34,12 @@ Unit tests ทดสอบ parser, validation, การบันทึกผ่
 - บันทึกหนึ่งครั้งต่อชุด ตรวจข้อมูลใน test Firebase และสถานะ sync, refresh และเทียบยอดกับรายการที่ยืนยัน
 
 ไม่ได้ deploy หรือ merge และไม่ได้อ่านหรือเขียนข้อมูลการเงินจริงระหว่างพัฒนา/ทดสอบ
+
+
+## Speech recognition state
+
+`speech-transcript.js` เก็บผลเป็น slot ตาม index ของ `event.results` และอัปเดตเฉพาะตำแหน่งตั้งแต่ `resultIndex` ผล interim ที่ถูกแก้หรือลบจะไม่ค้างอยู่ใน state แยก `finalTranscript` ออกจาก `interimTranscript` โดย interim แสดงในสถานะเท่านั้น ไม่ลงช่องข้อความสุดท้ายและไม่ส่งบันทึก เมื่อจบ session จะรับเฉพาะ final และไม่รับ callback ที่มาช้า
+
+`voice-entry.js` ผูก listener ครั้งเดียวต่อ dialog มี guard ไม่สร้าง recognition instance ใหม่ขณะกำลังฟังหรือกำลังหยุด `stop()` รอ final/onend ก่อนแสดงสรุป `onresult`, `onend` และ `onerror` ของ instance เก่าถูกปฏิเสธ การจบเสียงไม่เรียกบันทึก ผู้ใช้ต้องกดยืนยัน และการกดบันทึกซ้ำหลังปิดหน้าต่างไม่มีผล ไม่มีการลบคำซ้ำจากข้อความ: คำซ้ำจริงหรือรายการเหมือนกันในคนละ result slot ยังคงอยู่
+
+Regression tests รวมผลซ้ำหลาย event, interim → final, resultIndex มากกว่า 0, interim suffix หายไป, ผล final หลังผู้ใช้กดหยุด, callback เก่า, โหลด script/กดเริ่ม/กดหยุด/onend/กดบันทึกซ้ำ และประโยคซ้ำที่ตั้งใจพูด ทดสอบด้วย speech/Firebase mocks โดยไม่ใช้ข้อมูลการเงินจริง ยังต้องตรวจบริการเสียงบน S26 Ultra เครื่องจริง

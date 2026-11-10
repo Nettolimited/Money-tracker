@@ -1,5 +1,5 @@
-const CACHE = 'finance-v65';
-const FILES = ['./index.html', './style.css', './app.js', './voice-expense.js', './voice-entry.js', './manifest.json', './icon.svg'];
+const CACHE = 'finance-v66';
+const FILES = ['./index.html', './style.css', './app.js', './voice-expense.js', './voice-entry.js', './speech-transcript.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));

@@ -3,7 +3,10 @@
   'use strict';
   const el = id => document.getElementById('voice-' + id);
   const dialog = el('dialog');
-  let recognition = null, saving = false;
+  // Re-evaluating the script must not bind a second set of listeners.
+  if (!dialog || dialog.dataset.voiceEntryBound === 'true') return;
+  dialog.dataset.voiceEntryBound = 'true';
+  let recognition = null, stopping = false, saving = false;
   function status(message) { el('status').textContent = message; }
   function readItems() {
     return [...el('items').querySelectorAll('.voice-row')].map(row =>
@@ -26,10 +29,13 @@
   }
   function unconfirm() { el('save').disabled = true; }
   function invalidate() { unconfirm(); el('review').hidden = true; el('items').replaceChildren(); }
-  function stop() {
+  function stop(abort = true) {
     const active = recognition;
-    recognition = null;
-    if (active) { active.onresult = active.onerror = active.onend = null; active.abort(); }
+    recognition = null; stopping = false;
+    if (active) {
+      active.onresult = active.onerror = active.onend = null;
+      if (abort) active.abort();
+    }
     el('start').disabled = false;
     el('stop').disabled = true;
     el('parse').disabled = false;
@@ -51,6 +57,7 @@
     invalidate();
   });
   el('start').addEventListener('click', () => {
+    if (recognition || saving) return;
     const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Speech || !window.isSecureContext) {
       status('เบราว์เซอร์นี้ใช้ไมค์โดยตรงไม่ได้ เปิดผ่าน HTTPS บน Chrome หรือใช้ไมค์ภาษาไทยบนแป้นพิมพ์ Samsung แล้วกดแยกรายการ');
@@ -58,25 +65,19 @@
     }
     stop(); invalidate();
     const baseText = el('text').value.trim();
+    const transcript = SpeechTranscript.createSession();
     const active = new Speech(); recognition = active;
     active.lang = 'th-TH'; active.continuous = true; active.interimResults = true;
     active.onresult = event => {
       if (recognition !== active || !dialog.open) return;
-      // Android may resend or revise the same final result. Rebuild from the
-      // current session snapshot instead of appending each event to the textarea.
-      // Do not deduplicate by text: two genuinely spoken identical items are valid.
-      const finalParts = [];
-      let interim = '';
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) finalParts.push(result[0].transcript.trim());
-        else interim += result[0].transcript;
-      }
-      const text = [baseText, ...finalParts].filter(Boolean).join(' ');
+      const { finalTranscript, interimTranscript } = transcript.update(event);
+      const text = [baseText, finalTranscript].filter(Boolean).join(' ');
       if (el('text').value !== text) { el('text').value = text; invalidate(); }
-      status(interim ? 'กำลังฟัง: ' + interim : 'กำลังฟัง… กดหยุดฟังก่อนแยกรายการ');
+      // Interim text is displayed separately and is never persisted or parsed.
+      status(interimTranscript ? 'กำลังฟัง (ยังไม่ยืนยัน): ' + interimTranscript : 'กำลังฟัง… กดหยุดฟังก่อนตรวจสรุป');
     };
     active.onerror = event => {
+      if (recognition !== active || !dialog.open) return;
       stop();
       const messages = {
         'not-allowed': 'ไม่ได้รับอนุญาตใช้ไมค์ กรุณาเปิดสิทธิ์ไมค์หรือใช้ไมค์บนแป้นพิมพ์',
@@ -89,7 +90,9 @@
     };
     active.onend = () => {
       if (recognition !== active) return;
-      stop();
+      const { finalTranscript } = transcript.finish();
+      el('text').value = [baseText, finalTranscript].filter(Boolean).join(' ');
+      stop(false);
       if (el('text').value.trim()) buildReview();
       else status('ยังไม่มีข้อความ ลองพูดใหม่หรือใช้ไมค์แป้นพิมพ์');
     };
@@ -100,7 +103,7 @@
   });
   // Gracefully finish the current utterance before reviewing final results.
   el('stop').addEventListener('click', () => {
-    if (recognition) { el('stop').disabled = true; status('กำลังประมวลผลเสียงสุดท้าย…'); recognition.stop(); }
+    if (recognition && !stopping) { stopping = true; el('stop').disabled = true; status('กำลังประมวลผลเสียงสุดท้าย…'); recognition.stop(); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden && recognition) { stop(); status('หยุดไมค์เมื่อออกจากหน้าจอ กรุณาตรวจข้อความ'); } });
   function field(row, label, key, value, type = 'text') {
