@@ -1,8 +1,9 @@
 // ===== VERSION =====
 
 // For each user-facing release, bump APP_VERSION, add a CHANGELOG entry, and update the cache name in sw.js.
-const APP_VERSION = '6.1';
+const APP_VERSION = '6.2';
 const CHANGELOG = [
+  { v: '6.2', date: '13 พ.ย. 69', note: '🎙️ พูด “จ่ายผ่าน” ตามด้วยชื่อช่องทางจ่ายได้ ตรวจและแก้ช่องทางของแต่ละรายการก่อนบันทึก' },
   { v: '6.1', date: '13 พ.ย. 69', note: '🎙️ เพิ่มรายจ่ายด้วยเสียงภาษาไทยบนมือถือ ปรับปุ่มอัดเสียงและหน้าตรวจรายการให้กดง่าย เห็นยอดรวมก่อนยืนยัน และแก้การโหลดหน้าเก่าจากไอคอนแอป' },
   { v: '6.0', date: '27 ก.ค. 69', note: '📅 หน้ารายงาน: แสดงยอดรายรับ/รายจ่ายในแต่ละวันใต้กราฟรายวัน' },
   { v: '5.9', date: '17 ก.ค. 69', note: '🔍 ค้นหาเพิ่มได้: ยอดเงิน, วันที่, สกุลเงินต่างประเทศ' },
@@ -811,19 +812,22 @@ function createTransaction(fields) {
     foreignCurrency: '', foreignAmount: 0, foreignRate: 0, ...fields };
 }
 
-function saveVoiceExpenses(items, account, date) {
+function saveVoiceExpenses(items, date) {
   const data = getData();
-  if (!data.accounts.includes(account) || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
       !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) {
-    throw new Error('กรุณาเลือกบัญชีและวันที่');
+    throw new Error('กรุณาเลือกวันที่');
   }
   if (!items.length || items.some(item => !item.itemName.trim() ||
       !Number.isFinite(item.amount) || item.amount <= 0 ||
       !data.categories.expense.some(c => c.name === item.category))) {
     throw new Error('กรุณาตรวจชื่อรายการ ราคา และหมวดหมู่ทุกรายการ');
   }
+  if (items.some(item => !data.accounts.includes(item.account))) {
+    throw new Error('กรุณาเลือกช่องทางจ่ายทุกรายการ');
+  }
   const transactions = items.map(item => createTransaction({
-    type: 'expense', amount: item.amount, category: item.category, account, date,
+    type: 'expense', amount: item.amount, category: item.category, account: item.account, date,
     itemName: item.itemName.trim(), merchant: item.merchant.trim(),
     note: [item.itemName.trim(), item.merchant.trim() ? 'ร้าน ' + item.merchant.trim() : ''].filter(Boolean).join(' · ')
   }));

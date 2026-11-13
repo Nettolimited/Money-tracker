@@ -16,6 +16,30 @@ test('Thai digits, thousands, decimals and satang', () => {
   assert.equal(number('หนึ่งพันสองร้อยยี่สิบเอ็ด'), 1221);
   assert.equal(number('หกสิบจุดห้าศูนย์'), 60.5);
 });
+test('Spoken payment channels match existing accounts without changing the merchant or category', () => {
+  const accounts = ['เงินสด', 'QR Code', 'KBank', 'KTC', 'บัตรเดินทาง', 'บัตรร้านค้า'];
+  const items = parse('ข้าว 60 บาท ร้านป้าดา จ่ายผ่านเคแบงก์ แล้วกาแฟ 55 บาท จ่ายผ่านคิวอาร์ ที่ร้านอเมซอน หมวดกาแฟ/น้ำหวาน', categories, accounts);
+  assert.deepEqual(items.map(({account, merchant, category, itemName}) => [account, merchant, category, itemName]), [
+    ['KBank', 'ป้าดา', 'อาหาร', 'ข้าว'],
+    ['QR Code', 'อเมซอน', 'กาแฟ/น้ำหวาน', 'กาแฟ']
+  ]);
+  assert.equal(parse('ข้าว 50 บาท แล้วจ่ายผ่าน K T C', categories, accounts)[0].account, 'KTC');
+  assert.equal(parse('ข้าว 50 บาท จ่าย ผ่าน บัตรเดินทาง', categories, accounts)[0].account, 'บัตรเดินทาง');
+  const channelBeforePrice = parse('ข้าว จ่ายผ่านบัตรร้านค้า 50 บาท', categories, accounts)[0];
+  assert.equal(channelBeforePrice.account, 'บัตรร้านค้า');
+  assert.equal(channelBeforePrice.amount, 50);
+  assert.equal(parse('ข้าว 50 บาท', categories, accounts)[0].account, undefined);
+});
+test('Spoken payment never falls back to a guess for an unknown, missing or conflicting channel', () => {
+  const accounts = ['เงินสด', 'KBank', 'กสิกรไทย'];
+  for (const phrase of ['จ่ายผ่านบัตรอื่น', 'จ่ายผ่าน', 'จ่ายผ่านเคแบงก์', 'จ่ายผ่านเงินสด จ่ายผ่าน KBank']) {
+    const item = parse('ข้าว 50 บาท ' + phrase, categories, accounts)[0];
+    assert.equal(item.account, '', phrase);
+    assert.equal(item.itemName, 'ข้าว', phrase);
+    assert.equal(item.amount, 50, phrase);
+  }
+  assert.equal(parse('ข้าว 50 บาท จ่ายผ่าน KBank', categories, accounts)[0].account, 'KBank');
+});
 test('Ambiguity and unknown categories require review', () => {
   assert.equal(parse('น้ำ 20 บาท 30 บาท', categories)[0].amount, '');
   assert.equal(parse('น้ำ', categories)[0].amount, '');
@@ -31,12 +55,12 @@ function app() {
     document: {addEventListener() {}, getElementById() {return null;}},
     localStorage: {setItem() {}, getItem() {return null;}}, console, setTimeout, clearTimeout});
   vm.runInContext(fs.readFileSync(require.resolve('../app.js'), 'utf8'), context);
-  vm.runInContext(`_appData = { transactions: [{id:'untouched', amount:7}], accounts:['เงินสด'], categories:{expense:[{name:'อาหาร'}]} }; reRenderPage=()=>{}; showToast=()=>{}; setSyncStatus=()=>{};`, context);
+  vm.runInContext(`_appData = { transactions: [{id:'untouched', amount:7}], accounts:['เงินสด','KBank'], categories:{expense:[{name:'อาหาร'}]} }; reRenderPage=()=>{}; showToast=()=>{}; setSyncStatus=()=>{};`, context);
   return {context, writes};
 }
 test('Confirmed batch uses existing Firebase save once and preserves history', async () => {
   const {context, writes} = app();
-  vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'ป้าดา',amount:60,category:'อาหาร'}, {itemName:'ขนม',merchant:'',amount:20,category:'อาหาร'}], 'เงินสด', '2026-11-09')`, context);
+  vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'ป้าดา',amount:60,category:'อาหาร',account:'เงินสด'}, {itemName:'ขนม',merchant:'',amount:20,category:'อาหาร',account:'KBank'}], '2026-11-09')`, context);
   assert.equal(writes.length, 1);
   assert.equal(writes[0].path, 'appData');
   const txs = Object.values(writes[0].data.transactions);
@@ -46,14 +70,17 @@ test('Confirmed batch uses existing Firebase save once and preserves history', a
   assert.equal(txs[1].merchant, 'ป้าดา');
   assert.equal(txs[1].note, 'ข้าว · ร้าน ป้าดา');
   assert.equal(txs[1].type, 'expense');
+  assert.equal(txs[1].account, 'เงินสด');
+  assert.equal(txs[2].account, 'KBank');
   assert.notEqual(txs[1].id, txs[2].id);
 });
 test('Invalid batch never writes any item', () => {
   const {context, writes} = app();
   for (const amount of ['NaN', 'Infinity', '0', '-1']) {
-    assert.throws(() => vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร'}, {itemName:'น้ำ',merchant:'',amount:${amount},category:'อาหาร'}], 'เงินสด','2026-11-09')`, context));
+    assert.throws(() => vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'เงินสด'}, {itemName:'น้ำ',merchant:'',amount:${amount},category:'อาหาร',account:'เงินสด'}], '2026-11-09')`, context));
   }
-  assert.throws(() => vm.runInContext(`saveVoiceExpenses([], 'เงินสด','2026-11-09')`, context));
+  assert.throws(() => vm.runInContext("saveVoiceExpenses([], '2026-11-09')", context));
+  assert.throws(() => vm.runInContext("saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'บัตรอื่น'}], '2026-11-09')", context), /ช่องทางจ่าย/);
   assert.equal(writes.length, 0);
   assert.equal(vm.runInContext('_appData.transactions.length', context), 1);
 });
@@ -75,7 +102,7 @@ test('Manual save still uses original form fields and storage path', () => {
 test('Reject negative speech amounts and invalid dates; render names as text', () => {
   assert.equal(parse('ข้าว -60 บาท', categories)[0].amount, '');
   const {context, writes} = app();
-  assert.throws(() => vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร'}], 'เงินสด','2026-02-31')`, context));
+  assert.throws(() => vm.runInContext("saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'เงินสด'}], '2026-02-31')", context), /วันที่/);
   assert.equal(writes.length, 0);
   const html = vm.runInContext(`txHTML({id:'test',type:'expense',category:'อาหาร',note:'<img src=x onerror=alert(1)>',date:'2026-11-09',amount:60})`, context);
   assert.ok(html.includes('&lt;img'));

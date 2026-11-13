@@ -32,9 +32,12 @@
   }
   const formatAmount = value => value.toLocaleString('th-TH', { maximumFractionDigits: 2 });
   function readItems() {
-    return [...el('items').querySelectorAll('.voice-row')].map(row =>
-      Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input =>
-        [input.dataset.field, input.dataset.field === 'amount' ? (input.validity.valid ? Number(input.value) : NaN) : input.value])));
+    return [...el('items').querySelectorAll('.voice-row')].map(row => {
+      const item = Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input =>
+        [input.dataset.field, input.dataset.field === 'amount' ? (input.validity.valid ? Number(input.value) : NaN) : input.value]));
+      if (!item.account && row.hasAttribute('data-inherit-account')) item.account = el('account').value;
+      return item;
+    });
   }
   function refreshSummary() {
     const items = readItems();
@@ -45,14 +48,16 @@
     if (items.some(item => !item.itemName.trim())) missing.push('ชื่อรายการ');
     if (items.some(item => !Number.isFinite(item.amount) || item.amount <= 0)) missing.push('ราคา');
     if (items.some(item => !data.categories.expense.some(category => category.name === item.category))) missing.push('หมวดหมู่');
-    if (!data.accounts.includes(el('account').value)) missing.push('บัญชี');
+    if (items.some(item => !data.accounts.includes(item.account))) missing.push('ช่องทางจ่าย');
     if (!date.value || !date.validity.valid) missing.push('วันที่');
     el('save').disabled = saving || !items.length || !!missing.length || el('review').hidden || !!recognition;
     el('save').textContent = 'บันทึก ' + items.length + ' รายการ · ฿' + formatAmount(total);
     el('save-status').textContent = !items.length ? 'ยังไม่มีรายการให้บันทึก' : missing.length ? 'กรุณาระบุ' + missing.join(' และ') : '';
     const formattedDate = date.valueAsDate?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-    el('summary').textContent = [el('account').value || 'เลือกบัญชี', formattedDate || 'เลือกวันที่', 'แก้ไข'].join(' · ');
-    for (const row of el('items').querySelectorAll('.voice-row')) {
+    const inheritsAccount = el('items').querySelector('[data-inherit-account] [data-field=account] option[value=""]:checked');
+    const defaultAccount = inheritsAccount && el('account').value;
+    el('summary').textContent = [formattedDate || 'เลือกวันที่', defaultAccount && 'ค่าเริ่มต้น: ' + defaultAccount, 'แก้ไข'].filter(Boolean).join(' · ');
+    [...el('items').querySelectorAll('.voice-row')].forEach((row, index) => {
       const input = key => row.querySelector('[data-field=' + key + ']');
       const amount = input('amount');
       row.querySelector('.voice-item-name').textContent = input('itemName').value || 'กรุณาระบุชื่อ';
@@ -60,9 +65,12 @@
       row.querySelector('.voice-item-meta').textContent = [
         input('category').value || 'เลือกหมวดหมู่',
         input('merchant').value && 'ร้าน ' + input('merchant').value,
+        items[index].account ? 'จ่ายผ่าน ' + items[index].account : 'เลือกช่องทางจ่าย',
         'แก้ไข'
       ].filter(Boolean).join(' · ');
-    }
+      const accountWarning = row.querySelector('.voice-account-warning');
+      if (accountWarning) accountWarning.hidden = !!items[index].account;
+    });
   }
   function invalidate() {
     el('save').disabled = true;
@@ -175,7 +183,7 @@
   function buildReview() {
     stop(); invalidate();
     const data = getData();
-    const items = VoiceExpense.parse(el('text').value, data.categories.expense);
+    const items = VoiceExpense.parse(el('text').value, data.categories.expense, data.accounts);
     if (!items.length) { status('กรุณาพูดหรือพิมพ์รายการก่อน'); return; }
     el('account').replaceChildren(new Option('เลือกบัญชี / บัตร', ''), ...data.accounts.map(a => new Option(a, a)));
     const defaults = VoiceExpense.defaults(data);
@@ -196,8 +204,26 @@
       const label = document.createElement('label'); label.textContent = 'หมวดหมู่';
       const select = document.createElement('select'); select.className = 'form-input'; select.dataset.field = 'category';
       select.append(new Option('เลือกหมวดหมู่', ''), ...data.categories.expense.map(c => new Option(c.name, c.name)));
-      select.value = item.category; label.append(select); fields.append(label); row.append(fields);
-      row.open = !item.itemName || !item.amount || !item.category;
+      select.value = item.category; label.append(select); fields.append(label);
+      const hasSpokenAccount = item.spokenAccount !== undefined;
+      row.toggleAttribute('data-inherit-account', !hasSpokenAccount);
+      const accountLabel = document.createElement('label');
+      accountLabel.textContent = 'จ่ายผ่าน';
+      const accountSelect = document.createElement('select');
+      accountSelect.className = 'form-input';
+      accountSelect.dataset.field = 'account';
+      accountSelect.append(new Option(hasSpokenAccount ? 'เลือกช่องทางจ่าย' : 'ใช้ช่องทางเริ่มต้น', ''), ...data.accounts.map(account => new Option(account, account)));
+      accountSelect.value = item.account || '';
+      accountLabel.append(accountSelect);
+      fields.append(accountLabel);
+      row.append(fields);
+      row.open = !item.itemName || !item.amount || !item.category || !(hasSpokenAccount ? item.account : defaults.account);
+      if (hasSpokenAccount && !item.account) {
+        const warning = document.createElement('p');
+        warning.className = 'voice-item-warning voice-account-warning';
+        warning.textContent = item.spokenAccount ? 'ได้ยินว่า “' + item.spokenAccount + '” กรุณาเลือกช่องทางจ่าย' : 'กรุณาเลือกช่องทางจ่าย';
+        row.append(warning);
+      }
       if (item.warning) {
         const warning = document.createElement('p');
         warning.className = 'voice-item-warning';
@@ -224,7 +250,7 @@
     if (saving || el('save').disabled || el('review').hidden || recognition || !dialog.open) return;
     const items = readItems();
     saving = true; el('save').disabled = true;
-    try { saveVoiceExpenses(items, el('account').value, el('date').value); close(); }
+    try { saveVoiceExpenses(items, el('date').value); close(); }
     catch (error) {
       saving = false;
       refreshSummary();

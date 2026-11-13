@@ -5,6 +5,7 @@
   const units = {สิบ:10, ร้อย:100, พัน:1000, หมื่น:10000, แสน:100000, ล้าน:1000000};
   const numberWords = Object.keys({...digits, ...units}).join('|');
   const numberPattern = `(?:[0-9๐-๙]+(?:,[0-9๐-๙]{3})*(?:\\.[0-9๐-๙]{1,2})?|(?:(?:${numberWords})\\s*)+(?:จุด\\s*(?:(?:${Object.keys(digits).join('|')})\\s*)+)?)`;
+  const paymentPattern = new RegExp('จ่าย\\s*ผ่าน\\s*(.*?)(?=\\s*(?:จ่าย\\s*ผ่าน|หมวดหมู่|หมวด|ที่ร้าน|จากร้าน|' + numberPattern + '\\s*บาท)|\\s+ร้าน|$)', 'g');
   function number(text) {
     text = text.replace(/[๐-๙]/g, d => '๐๑๒๓๔๕๖๗๘๙'.indexOf(d)).replace(/\s|,/g, '');
     if (/^\d+(\.\d{1,2})?$/.test(text)) return Number(text);
@@ -25,10 +26,46 @@
     }
     return Math.round(value * 100) / 100;
   }
-  function parse(text, categories) {
+  function accountKey(name) {
+    return name.normalize('NFKC').toLowerCase().replace(/[\s._-]+/g, '');
+  }
+  const accountAliases = [
+    ['เงินสด', 'สด'],
+    ['QR Code', 'QR', 'คิวอาร์', 'คิวอาร์โค้ด'],
+    ['KBank', 'เคแบงก์', 'เคแบงค์', 'กสิกร', 'กสิกรไทย', 'K Plus', 'เคพลัส'],
+    ['KTC', 'เคทีซี'],
+    ['TTB', 'ทีทีบี'],
+    ['Make', 'เมค', 'Make by KBank'],
+    ['Krungsri NOW', 'กรุงศรีนาว', 'กรุงศรี NOW'],
+    ['Easy Pass', 'อีซี่พาส'],
+    ['Spaylater', 'เอสเพย์เลเทอร์', 'ช้อปปี้เพย์เลเทอร์'],
+    ['ShopeePay', 'ช้อปปี้เพย์', 'ช็อปปี้เพย์'],
+    ['SCB Easy', 'SCB', 'ไทยพาณิชย์', 'เอสซีบี', 'เอสซีบีอีซี่'],
+    ['TRUE Money', 'ทรูมันนี่', 'ทรูมันนี่วอลเล็ท', 'TrueMoney Wallet']
+  ].map(group => group.map(accountKey));
+
+  function matchAccount(spoken, accounts) {
+    const key = accountKey(spoken);
+    const exact = accounts.filter(account => accountKey(account) === key);
+    if (exact.length) return exact.length === 1 ? exact[0] : '';
+    const group = accountAliases.find(aliases => aliases.includes(key));
+    const matches = group ? accounts.filter(account => group.includes(accountKey(account))) : [];
+    return matches.length === 1 ? matches[0] : '';
+  }
+
+  function parse(text, categories, accounts = []) {
     const names = categories.map(c => typeof c === 'string' ? c : c.name);
-    return text.split(/\n|;|แล้วก็|แล้ว|รายการถัดไป|\s*และ\s*/).map(s => s.trim()).filter(Boolean).map(source => {
-      let rest = source.replace(/^(?:ซื้อ|จ่ายค่า|จ่าย)\s*/, '');
+    const sources = [];
+    for (const part of text.split(/\n|;|แล้วก็|แล้ว|รายการถัดไป|\s*และ\s*/).map(s => s.trim()).filter(Boolean)) {
+      if (/^จ่าย\s*ผ่าน/.test(part) && sources.length) sources[sources.length - 1] += ' ' + part;
+      else sources.push(part);
+    }
+    return sources.map(source => {
+      const payments = [];
+      let rest = source.replace(paymentPattern, (_, payment) => {
+        payments.push(payment.trim().replace(/^[,:：]+|[,.!?]+$/g, '').trim());
+        return ' ';
+      }).trim().replace(/^(?:ซื้อ|จ่ายค่า|จ่าย)\s*/, '');
       let category = '';
       const explicit = rest.match(/(?:หมวดหมู่|หมวด)\s*(.+)$/);
       if (explicit) { category = names.find(n => n === explicit[1].trim()) || ''; rest = rest.slice(0, explicit.index).trim(); }
@@ -57,7 +94,13 @@
         category = cafeDrink && names.includes('กาแฟ/น้ำหวาน') ? 'กาแฟ/น้ำหวาน' :
           (rules.find(([r, n]) => r.test(itemName) && names.includes(n)) || [null, ''])[1];
       }
-      return {itemName, amount, merchant, category, warning};
+      const item = {itemName, amount, merchant, category, warning};
+      if (payments.length) {
+        item.spokenAccount = payments.filter(Boolean).join(' / ');
+        const matches = payments.map(payment => matchAccount(payment, accounts));
+        item.account = matches.every(account => account && account === matches[0]) ? matches[0] : '';
+      }
+      return item;
     });
   }
   function defaults(data, now = new Date()) {
