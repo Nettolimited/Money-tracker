@@ -114,9 +114,11 @@
 
     <!-- ===== ADD / EDIT ===== -->
     <div id="page-add" class="page">
-      <div class="card">
-        <button type="button" class="btn-secondary" id="voice-open">🎙️ เพิ่มรายจ่ายด้วยเสียง</button>
-      </div>
+      <button type="button" id="voice-open" class="voice-launch">
+        <span class="voice-launch-icon" aria-hidden="true">🎙</span>
+        <span><strong>เพิ่มรายจ่ายด้วยเสียง</strong><small>พูดรายการ แล้วตรวจยอดก่อนบันทึก</small></span>
+        <span class="voice-launch-arrow" aria-hidden="true">›</span>
+      </button>
       <div id="quick-add-section" class="card" style="display:none">
         <div class="section-label" style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:6px">⚡ Quick Add</div>
         <div id="quick-chips"></div>
@@ -1213,34 +1215,53 @@
 </div>
 
 <dialog id="voice-dialog" aria-labelledby="voice-title">
-  <h2 id="voice-title">🎙️ เพิ่มรายจ่ายด้วยเสียง</h2>
-  <p id="voice-version">กำลังโหลดระบบเสียง…</p>
-  <p>พูด เช่น “ข้าว 60 บาท ร้านป้าดา แล้ว กาแฟ 55 บาท ร้านอเมซอน” ใช้ “แล้ว” หรือขึ้นบรรทัดใหม่เพื่อแยกรายการ</p>
-  <p>ใช้เสียงภาษาไทยของเบราว์เซอร์ อาจส่งเสียงไปยังผู้ให้บริการและต้องใช้อินเทอร์เน็ต ไม่มี AI API แบบเสียเงินที่ต้องสมัครเพิ่ม</p>
-  <button type="button" id="voice-start" class="btn-secondary">เริ่มพูด</button>
-  <button type="button" id="voice-stop" class="btn-secondary" disabled>หยุดฟัง</button>
-  <p id="voice-status" role="status" aria-live="polite"></p>
-  <label for="voice-text">ข้อความที่ได้ (แก้ไขหรือใช้ไมค์บนแป้นพิมพ์ Samsung ได้)</label>
-  <textarea id="voice-text" class="form-input" rows="4"></textarea>
-  <button type="button" id="voice-parse" class="btn-secondary">แยกรายการเพื่อตรวจสอบ</button>
-  <div id="voice-review" hidden>
-    <p>ตรวจสอบทุกรายการ หมวดหมู่เป็นเพียงคำแนะนำ รายการจะบันทึกเป็นรายจ่ายเงินบาท</p>
-    <p id="voice-summary" role="status" aria-live="polite"></p>
-    <details><summary>เปลี่ยนวันที่ / บัญชี</summary>
-    <label for="voice-account">บัญชี / บัตรสำหรับชุดนี้</label>
-    <select id="voice-account" class="form-input"></select>
-    <label for="voice-date">วันที่สำหรับชุดนี้</label>
-    <input id="voice-date" type="date" class="form-input">
-    </details>
-    <div id="voice-items"></div>
-    <button type="button" id="voice-save" class="btn-primary" disabled>ยืนยันบันทึก</button>
+  <div class="voice-sheet">
+    <header class="voice-header">
+      <h2 id="voice-title">บันทึกรายจ่ายด้วยเสียง</h2>
+      <button type="button" id="voice-cancel" class="voice-close" aria-label="ปิดหน้าบันทึกรายจ่ายด้วยเสียง">×</button>
+    </header>
+    <div id="voice-body" class="voice-body">
+      <div class="voice-capture">
+        <p id="voice-example">ลองพูด “ข้าว 60 บาท แล้วกาแฟ 55 บาท”</p>
+        <button type="button" id="voice-start" class="voice-record" autofocus>
+          <span aria-hidden="true">🎙</span> <span id="voice-start-label">เริ่มพูด</span>
+        </button>
+        <button type="button" id="voice-stop" class="voice-record voice-record-stop" hidden disabled>
+          <span class="voice-stop-icon" aria-hidden="true"></span> <span id="voice-stop-label">หยุดฟัง</span>
+        </button>
+        <p id="voice-status" role="status"></p>
+      </div>
+      <details id="voice-transcript" class="voice-details">
+        <summary id="voice-transcript-label">พิมพ์หรือใช้ไมค์บนแป้นพิมพ์</summary>
+        <label for="voice-text">ข้อความรายการ</label>
+        <textarea id="voice-text" class="form-input" rows="3" placeholder="เช่น ข้าว 60 บาท แล้วกาแฟ 55 บาท"></textarea>
+        <button type="button" id="voice-parse" class="voice-secondary">ตรวจรายการ</button>
+      </details>
+      <section id="voice-review" aria-labelledby="voice-review-title" hidden>
+        <h3 id="voice-review-title" tabindex="-1">ตรวจรายการก่อนบันทึก</h3>
+        <details class="voice-details">
+          <summary id="voice-summary"></summary>
+          <div class="voice-field-grid">
+            <label>บัญชี / บัตร<select id="voice-account" class="form-input"></select></label>
+            <label>วันที่<input id="voice-date" type="date" class="form-input"></label>
+          </div>
+        </details>
+        <div id="voice-items"></div>
+      </section>
+      <details id="voice-help" class="voice-help">
+        <summary>วิธีใช้และข้อมูลตรวจปัญหา</summary>
+        <p>ใช้คำว่า “แล้ว” คั่นแต่ละรายการ การรู้จำเสียงอาจส่งเสียงไปยังบริการของเบราว์เซอร์</p>
+        <p id="voice-version"></p>
+        <p>ข้อมูลตรวจปัญหามีข้อความที่พูด เก็บชั่วคราวในหน้านี้ และส่งต่อได้ด้วยการคัดลอกเอง</p>
+        <textarea id="voice-diagnostics" class="form-input" rows="4" readonly aria-label="ข้อมูลตรวจปัญหาเสียง"></textarea>
+        <button type="button" id="voice-copy-diagnostics" class="voice-secondary">คัดลอกข้อมูลตรวจปัญหา</button>
+      </details>
+    </div>
+    <footer id="voice-footer" class="voice-footer" hidden>
+      <p id="voice-save-status" role="status"></p>
+      <button type="button" id="voice-save" class="voice-save" disabled>ยืนยันบันทึก</button>
+    </footer>
   </div>
-  <details><summary>ตรวจสอบปัญหาเสียง</summary>
-    <p>ข้อมูลนี้อยู่ในหน้านี้เท่านั้น ไม่ส่งออกอัตโนมัติ คัดลอกส่งผู้ช่วยได้เมื่อมีปัญหา (มีข้อความที่พูด)</p>
-    <textarea id="voice-diagnostics" class="form-input" rows="6" readonly aria-label="ข้อมูลตรวจปัญหาเสียง"></textarea>
-    <button type="button" id="voice-copy-diagnostics" class="btn-secondary">คัดลอกข้อมูลตรวจปัญหา</button>
-  </details>
-  <button type="button" id="voice-cancel" class="btn-secondary">ปิด / ยกเลิก</button>
 </dialog>
 <script src="voice-expense.js"></script>
 <script src="app.js"></script>

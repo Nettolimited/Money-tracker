@@ -27,7 +27,23 @@ const root = path.resolve(__dirname, '..');
   await page.goto('http://localhost:4173/');
   await page.evaluate(() => {showApp(); navigate('add'); window._db = {ref: path => ({set: data => {window._writes.push({path,data});return Promise.resolve();}})};});
   const open = () => page.locator('#voice-open').click();
-  const parse = async (text) => {await page.locator('#voice-text').fill(text); await page.locator('#voice-parse').click();};
+  const openTranscript = async () => {
+    const transcript = page.locator('#voice-transcript');
+    if (await transcript.getAttribute('open') === null) await transcript.locator('summary').click();
+  };
+  const parse = async (text) => {await openTranscript(); await page.locator('#voice-text').fill(text); await page.locator('#voice-parse').click();};
+  await page.setViewportSize({width: 320, height: 568});
+  await open();
+  await parse(Array.from({length: 8}, () => 'ข้าวหมูกรอบ 60 บาท ร้านทดสอบชื่อร้านยาวเป็นพิเศษ').join(' แล้ว '));
+  assert.equal(await page.locator('.voice-row').count(), 8);
+  const layout = await page.locator('#voice-body').evaluate(body => ({
+    overflowX: body.scrollWidth > body.clientWidth,
+    overflowY: body.scrollHeight > body.clientHeight
+  }));
+  assert.deepEqual(layout, {overflowX: false, overflowY: true});
+  assert.ok(await page.locator('#voice-save').evaluate(button => button.getBoundingClientRect().bottom <= window.innerHeight));
+  await page.locator('#voice-cancel').click();
+  await page.setViewportSize({width: 412, height: 915});
   await open();
   // Unsupported recognition still allows keyboard/manual entry.
   await page.evaluate(() => {window.SpeechRecognition = window.webkitSpeechRecognition = undefined;});
@@ -39,12 +55,15 @@ const root = path.resolve(__dirname, '..');
   assert.equal(await page.locator('#voice-save').isDisabled(), false);
   assert.equal(await page.locator('#voice-account').inputValue(), 'เงินสด');
   assert.equal(await page.locator('#voice-date').inputValue(), await page.evaluate(() => VoiceExpense.defaults(getData()).date));
-  assert.match(await page.locator('#voice-summary').textContent(), /115/);
-  await page.locator('.voice-row details summary').first().click();
+  assert.match(await page.locator('#voice-save').textContent(), /115/);
+  assert.equal(await page.locator('#voice-footer').isVisible(), true);
+  assert.match(await page.locator('.voice-item-name').first().textContent(), /ข้าว/);
+  await page.locator('.voice-row > summary').first().click();
   await page.locator('.voice-row [data-field=amount]').first().fill('65');
   assert.match(await page.locator('#voice-save').textContent(), /120/);
   await page.locator('.voice-row [data-field=amount]').first().fill('');
   assert.equal(await page.locator('#voice-save').isDisabled(), true);
+  assert.equal(await page.locator('#voice-save-status').textContent(), 'กรุณาระบุราคา');
   await page.locator('.voice-row [data-field=amount]').first().fill('65');
   await page.locator('#voice-save').click();
   // Dispatch another click after dialog closes: it must not write again.
@@ -56,6 +75,7 @@ const root = path.resolve(__dirname, '..');
   await open(); await parse('ข้าว 10 บาท'); await page.locator('#voice-cancel').click();
   assert.equal(await page.evaluate(() => _writes.length), 1);
   await open(); await parse('ข้าว 10 บาท');
+  await openTranscript();
   await page.locator('#voice-text').fill('กาแฟ 80 บาท');
   assert.equal(await page.locator('#voice-review').isHidden(), true);
   await page.locator('#voice-cancel').click();
@@ -72,7 +92,9 @@ const root = path.resolve(__dirname, '..');
   assert.equal(await page.evaluate(() => _speechCount), 1);
   assert.equal(await page.evaluate(() => _speech.lang), 'th-TH');
   assert.equal(await page.evaluate(() => _speech.continuous), false);
-  assert.match(await page.locator('#voice-version').textContent(), /รุ่น 5/);
+  assert.equal(await page.locator('#voice-version').textContent(), await page.evaluate(() => 'Money Tracker v' + APP_VERSION));
+  assert.equal(await page.locator('#voice-stop').isVisible(), true);
+  assert.equal(await page.locator('#voice-start').isHidden(), true);
   await page.evaluate(() => {const r=[{transcript:'ข้าวหกสิบบาท ร้านป้าดา'}];r.isFinal=true;_speech.onresult({resultIndex:0,results:[r]});});
   assert.match(await page.locator('#voice-text').inputValue(), /หกสิบ/);
   await page.evaluate(() => _speech.onspeechend());
@@ -123,6 +145,7 @@ const root = path.resolve(__dirname, '..');
   // Manual edits stop recognition, and callbacks captured before cancellation are stale.
   await open(); await page.locator('#voice-start').click();
   await page.evaluate(() => { window._lateResult=_speech.onresult; });
+  await openTranscript();
   await page.locator('#voice-text').fill('ข้าว 70 บาท');
   await page.evaluate(() => {const r=[{transcript:'stale text'}];r.isFinal=true;_lateResult({resultIndex:0,results:[r]});});
   assert.equal(await page.locator('#voice-text').inputValue(), 'ข้าว 70 บาท');
@@ -138,6 +161,7 @@ const root = path.resolve(__dirname, '..');
   assert.equal(await page.locator('#voice-text').inputValue(), '');
   assert.match(await page.locator('#voice-status').textContent(), /ยังไม่ยืนยัน/);
   await page.locator('#voice-stop').click();
+  assert.match(await page.locator('#voice-stop').textContent(), /กำลังประมวลผล/);
   await page.evaluate(() => document.getElementById('voice-stop').dispatchEvent(new Event('click')));
   await page.evaluate(() => { _speech.onspeechend(); _speech.onspeechend(); });
   assert.equal(await page.evaluate(() => _stopCalls), 1);
