@@ -49,6 +49,31 @@ test('Ambiguity and unknown categories require review', () => {
   assert.equal(parse('ข้าว 60 บาท\nกาแฟ 40 บาท;น้ำ 10 บาท', categories).length, 3);
   assert.deepEqual(parse('', categories), []);
 });
+test('Spoken dates use local calendar days across a month, year and leap day', () => {
+  const now = new Date(2024, 2, 1, 0, 5);
+  const text = 'เมื่อวานข้าว 60 บาท ร้านป้าดา จ่ายผ่านเงินสด แล้วกาแฟ 55 บาท จ่ายผ่าน KBank สองวันที่แล้ว แล้วขนม 20 บาท';
+  const items = parse(text, categories, ['เงินสด', 'KBank'], now);
+  assert.deepEqual(items.map(({itemName, date, account, merchant}) => [itemName, date, account, merchant]), [
+    ['ข้าว', '2024-02-29', 'เงินสด', 'ป้าดา'],
+    ['กาแฟ', '2024-02-28', 'KBank', ''],
+    ['ขนม', undefined, undefined, '']
+  ]);
+  const newYear = new Date(2026, 0, 1, 23, 55);
+  for (const phrase of ['สองวันก่อน', '2 วันก่อน', '๒ วันที่แล้ว', 'เมื่อวานซืน']) {
+    assert.equal(parse('ข้าว 50 บาท แล้ว ' + phrase, categories, [], newYear)[0].date, '2025-12-30');
+  }
+  assert.equal(parse('วันนี้ ข้าว 50 บาท', categories, [], newYear)[0].date, '2026-01-01');
+});
+test('Unclear or conflicting spoken dates require a date selection', () => {
+  const now = new Date(2026, 10, 14);
+  for (const phrase of ['วันก่อน', 'หลายวันก่อน', 'ไม่กี่วันก่อน', 'สองสามวันก่อน', '2.5 วันก่อน', 'เมื่อวาน สองวันก่อน']) {
+    const item = parse('ข้าว 50 บาท ' + phrase, categories, [], now)[0];
+    assert.equal(item.date, '', phrase);
+    assert.equal(item.amount, 50, phrase);
+    assert.equal(item.itemName, 'ข้าว', phrase);
+  }
+  assert.equal(parse('เมื่อวาน ข้าว 50 บาท เมื่อวานนี้', categories, [], now)[0].date, '2026-11-13');
+});
 function app() {
   const writes = [];
   const context = vm.createContext({window: {_db: {ref: path => ({set: data => { writes.push({path, data}); return Promise.resolve(); }})}},
@@ -60,7 +85,7 @@ function app() {
 }
 test('Confirmed batch uses existing Firebase save once and preserves history', async () => {
   const {context, writes} = app();
-  vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'ป้าดา',amount:60,category:'อาหาร',account:'เงินสด'}, {itemName:'ขนม',merchant:'',amount:20,category:'อาหาร',account:'KBank'}], '2026-11-09')`, context);
+  vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'ป้าดา',amount:60,category:'อาหาร',account:'เงินสด',date:'2026-11-13'}, {itemName:'ขนม',merchant:'',amount:20,category:'อาหาร',account:'KBank',date:'2026-11-12'}])`, context);
   assert.equal(writes.length, 1);
   assert.equal(writes[0].path, 'appData');
   const txs = Object.values(writes[0].data.transactions);
@@ -72,15 +97,17 @@ test('Confirmed batch uses existing Firebase save once and preserves history', a
   assert.equal(txs[1].type, 'expense');
   assert.equal(txs[1].account, 'เงินสด');
   assert.equal(txs[2].account, 'KBank');
+  assert.equal(txs[1].date, '2026-11-13');
+  assert.equal(txs[2].date, '2026-11-12');
   assert.notEqual(txs[1].id, txs[2].id);
 });
 test('Invalid batch never writes any item', () => {
   const {context, writes} = app();
   for (const amount of ['NaN', 'Infinity', '0', '-1']) {
-    assert.throws(() => vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'เงินสด'}, {itemName:'น้ำ',merchant:'',amount:${amount},category:'อาหาร',account:'เงินสด'}], '2026-11-09')`, context));
+    assert.throws(() => vm.runInContext(`saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'เงินสด',date:'2026-11-09'}, {itemName:'น้ำ',merchant:'',amount:${amount},category:'อาหาร',account:'เงินสด',date:'2026-11-09'}])`, context));
   }
-  assert.throws(() => vm.runInContext("saveVoiceExpenses([], '2026-11-09')", context));
-  assert.throws(() => vm.runInContext("saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'บัตรอื่น'}], '2026-11-09')", context), /ช่องทางจ่าย/);
+  assert.throws(() => vm.runInContext("saveVoiceExpenses([])", context));
+  assert.throws(() => vm.runInContext("saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'บัตรอื่น',date:'2026-11-09'}])", context), /ช่องทางจ่าย/);
   assert.equal(writes.length, 0);
   assert.equal(vm.runInContext('_appData.transactions.length', context), 1);
 });
@@ -102,7 +129,7 @@ test('Manual save still uses original form fields and storage path', () => {
 test('Reject negative speech amounts and invalid dates; render names as text', () => {
   assert.equal(parse('ข้าว -60 บาท', categories)[0].amount, '');
   const {context, writes} = app();
-  assert.throws(() => vm.runInContext("saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'เงินสด'}], '2026-02-31')", context), /วันที่/);
+  assert.throws(() => vm.runInContext("saveVoiceExpenses([{itemName:'ข้าว',merchant:'',amount:60,category:'อาหาร',account:'เงินสด',date:'2026-02-28'},{itemName:'กาแฟ',merchant:'',amount:50,category:'อาหาร',account:'เงินสด',date:'2026-02-31'}])", context), /วันที่/);
   assert.equal(writes.length, 0);
   const html = vm.runInContext(`txHTML({id:'test',type:'expense',category:'อาหาร',note:'<img src=x onerror=alert(1)>',date:'2026-11-09',amount:60})`, context);
   assert.ok(html.includes('&lt;img'));

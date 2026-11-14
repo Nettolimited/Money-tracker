@@ -31,11 +31,15 @@
     el('start-label').textContent = el('text').value.trim() ? 'พูดต่อ' : 'เริ่มพูด';
   }
   const formatAmount = value => value.toLocaleString('th-TH', { maximumFractionDigits: 2 });
+  const formatDate = value => new Date(value + 'T00:00:00Z').toLocaleDateString('th-TH', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
+  });
   function readItems() {
     return [...el('items').querySelectorAll('.voice-row')].map(row => {
       const item = Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input =>
         [input.dataset.field, input.dataset.field === 'amount' ? (input.validity.valid ? Number(input.value) : NaN) : input.value]));
       if (!item.account && row.hasAttribute('data-inherit-account')) item.account = el('account').value;
+      if (!item.date && row.hasAttribute('data-inherit-date')) item.date = el('date').value;
       return item;
     });
   }
@@ -43,20 +47,24 @@
     const items = readItems();
     const total = items.reduce((sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : 0), 0);
     const data = getData();
-    const date = el('date');
     const missing = [];
     if (items.some(item => !item.itemName.trim())) missing.push('ชื่อรายการ');
     if (items.some(item => !Number.isFinite(item.amount) || item.amount <= 0)) missing.push('ราคา');
     if (items.some(item => !data.categories.expense.some(category => category.name === item.category))) missing.push('หมวดหมู่');
     if (items.some(item => !data.accounts.includes(item.account))) missing.push('ช่องทางจ่าย');
-    if (!date.value || !date.validity.valid) missing.push('วันที่');
+    if (items.some(item => !isVoiceExpenseDate(item.date))) missing.push('วันที่');
     el('save').disabled = saving || !items.length || !!missing.length || el('review').hidden || !!recognition;
     el('save').textContent = 'บันทึก ' + items.length + ' รายการ · ฿' + formatAmount(total);
     el('save-status').textContent = !items.length ? 'ยังไม่มีรายการให้บันทึก' : missing.length ? 'กรุณาระบุ' + missing.join(' และ') : '';
-    const formattedDate = date.valueAsDate?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const inheritsDate = [...el('items').querySelectorAll('[data-inherit-date] [data-field=date]')].some(input => !input.value);
+    const defaultDate = el('date').value;
     const inheritsAccount = el('items').querySelector('[data-inherit-account] [data-field=account] option[value=""]:checked');
     const defaultAccount = inheritsAccount && el('account').value;
-    el('summary').textContent = [formattedDate || 'เลือกวันที่', defaultAccount && 'ค่าเริ่มต้น: ' + defaultAccount, 'แก้ไข'].filter(Boolean).join(' · ');
+    el('summary').textContent = [
+      inheritsDate && (isVoiceExpenseDate(defaultDate) ? formatDate(defaultDate) : 'เลือกวันที่เริ่มต้น'),
+      defaultAccount && 'ค่าเริ่มต้น: ' + defaultAccount,
+      'แก้ค่าเริ่มต้น'
+    ].filter(Boolean).join(' · ');
     [...el('items').querySelectorAll('.voice-row')].forEach((row, index) => {
       const input = key => row.querySelector('[data-field=' + key + ']');
       const amount = input('amount');
@@ -66,10 +74,13 @@
         input('category').value || 'เลือกหมวดหมู่',
         input('merchant').value && 'ร้าน ' + input('merchant').value,
         items[index].account ? 'จ่ายผ่าน ' + items[index].account : 'เลือกช่องทางจ่าย',
+        isVoiceExpenseDate(items[index].date) ? formatDate(items[index].date) : 'เลือกวันที่',
         'แก้ไข'
       ].filter(Boolean).join(' · ');
       const accountWarning = row.querySelector('.voice-account-warning');
       if (accountWarning) accountWarning.hidden = !!items[index].account;
+      const dateWarning = row.querySelector('.voice-date-warning');
+      if (dateWarning) dateWarning.hidden = isVoiceExpenseDate(items[index].date);
     });
   }
   function invalidate() {
@@ -183,10 +194,11 @@
   function buildReview() {
     stop(); invalidate();
     const data = getData();
-    const items = VoiceExpense.parse(el('text').value, data.categories.expense, data.accounts);
+    const now = new Date();
+    const items = VoiceExpense.parse(el('text').value, data.categories.expense, data.accounts, now);
     if (!items.length) { status('กรุณาพูดหรือพิมพ์รายการก่อน'); return; }
     el('account').replaceChildren(new Option('เลือกบัญชี / บัตร', ''), ...data.accounts.map(a => new Option(a, a)));
-    const defaults = VoiceExpense.defaults(data);
+    const defaults = VoiceExpense.defaults(data, now);
     el('account').value = defaults.account;
     el('date').value = defaults.date;
     for (const item of items) {
@@ -216,8 +228,12 @@
       accountSelect.value = item.account || '';
       accountLabel.append(accountSelect);
       fields.append(accountLabel);
+      const hasSpokenDate = item.spokenDate !== undefined;
+      row.toggleAttribute('data-inherit-date', !hasSpokenDate);
+      field(fields, hasSpokenDate ? 'วันที่' : 'วันที่ (เว้นว่างเพื่อใช้ค่าเริ่มต้น)', 'date', item.date || '', 'date');
       row.append(fields);
-      row.open = !item.itemName || !item.amount || !item.category || !(hasSpokenAccount ? item.account : defaults.account);
+      row.open = !item.itemName || !item.amount || !item.category ||
+        !(hasSpokenAccount ? item.account : defaults.account) || (hasSpokenDate && !item.date);
       if (hasSpokenAccount && !item.account) {
         const warning = document.createElement('p');
         warning.className = 'voice-item-warning voice-account-warning';
@@ -228,6 +244,12 @@
         const warning = document.createElement('p');
         warning.className = 'voice-item-warning';
         warning.textContent = item.warning;
+        row.append(warning);
+      }
+      if (hasSpokenDate && !item.date) {
+        const warning = document.createElement('p');
+        warning.className = 'voice-item-warning voice-date-warning';
+        warning.textContent = 'ได้ยินวันที่ “' + item.spokenDate + '” กรุณาเลือกวันที่';
         row.append(warning);
       }
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'voice-remove'; remove.textContent = 'ลบรายการนี้';
@@ -250,7 +272,7 @@
     if (saving || el('save').disabled || el('review').hidden || recognition || !dialog.open) return;
     const items = readItems();
     saving = true; el('save').disabled = true;
-    try { saveVoiceExpenses(items, el('date').value); close(); }
+    try { saveVoiceExpenses(items); close(); }
     catch (error) {
       saving = false;
       refreshSummary();

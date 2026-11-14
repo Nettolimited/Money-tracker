@@ -1,4 +1,4 @@
-const CACHE = 'finance-v71';
+const CACHE = 'finance-v72';
 const FILES = ['./index.html', './style.css', './app.js', './voice-expense.js', './voice-entry.js', './speech-transcript.js', './manifest.json', './icon.svg'];
 const APP_URL = new URL('./index.html', self.registration.scope);
 const ROOT_URL = new URL('./', self.registration.scope);

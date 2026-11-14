@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 (async () => {
   const browser = await chromium.launch({executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args:['--no-sandbox']});
-  const context = await browser.newContext({viewport:{width:412,height:915}, isMobile:true, hasTouch:true, serviceWorkers:'block'});
+  const context = await browser.newContext({viewport:{width:412,height:915}, isMobile:true, hasTouch:true, serviceWorkers:'block', timezoneId:'Asia/Bangkok'});
   const external = [];
   await context.route('**/*', async route => {
     const url = new URL(route.request().url());
@@ -205,6 +205,28 @@ const root = path.resolve(__dirname, '..');
   await page.locator('#voice-save').click();
   assert.equal(await page.evaluate(() => _writes.length), 3);
   assert.deepEqual(await page.evaluate(() => getData().transactions.slice(-2).map(item => item.account)), ['KBank', 'QR Code']);
+  await page.clock.setFixedTime(new Date('2026-11-13T17:05:00Z'));
+  await open(); await page.locator('#voice-start').click();
+  await page.evaluate(() => {
+    const result = [{transcript:'เมื่อวานข้าว 50 บาท จ่ายผ่านเงินสด แล้วสองวันก่อนกาแฟ 55 บาท จ่ายผ่านเคแบงก์ แล้ววันก่อนข้าว 25 บาท แล้วข้าว 30 บาท'}];
+    result.isFinal = true;
+    _speech.onresult({resultIndex:0, results:[result]});
+    _speech.onspeechend();
+  });
+  const datedRows = page.locator('.voice-row');
+  assert.equal(await datedRows.count(), 4);
+  assert.equal(await datedRows.nth(0).locator('[data-field=date]').inputValue(), '2026-11-13');
+  assert.equal(await datedRows.nth(1).locator('[data-field=date]').inputValue(), '2026-11-12');
+  assert.match(await datedRows.nth(0).locator('.voice-item-meta').textContent(), /13 พ.ย. 2569/);
+  assert.match(await datedRows.nth(2).locator('.voice-date-warning').textContent(), /วันก่อน/);
+  assert.equal(await page.locator('#voice-save').isDisabled(), true);
+  await datedRows.nth(2).locator('[data-field=date]').fill('2026-11-10');
+  await page.locator('#voice-summary').click();
+  await page.locator('#voice-date').fill('2026-11-09');
+  assert.equal(await page.locator('#voice-save').isEnabled(), true);
+  await page.locator('#voice-save').click();
+  assert.equal(await page.evaluate(() => _writes.length), 4);
+  assert.deepEqual(await page.evaluate(() => getData().transactions.slice(-4).map(item => item.date)), ['2026-11-13', '2026-11-12', '2026-11-10', '2026-11-09']);
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
   console.log('PASS: mobile review, automatic date/account, single confirmation, invalid price lock, live summary, mock Firebase batch, duplicate click, cancel, transcript edit, Thai speech, repeated/revised Android snapshots, session restart, intentional repeated items, stale events, noncontinuous automatic speechend, duplicate initialization/start/stop/speechend/end/save, final after stop, denied microphone, Escape; zero external requests.');
   await browser.close();

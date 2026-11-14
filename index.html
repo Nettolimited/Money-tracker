@@ -1222,7 +1222,7 @@
     </header>
     <div id="voice-body" class="voice-body">
       <div class="voice-capture">
-        <p id="voice-example">ลองพูด “ข้าว 60 บาท จ่ายผ่านเงินสด”</p>
+        <p id="voice-example">ลองพูด “เมื่อวาน ข้าว 60 บาท จ่ายผ่านเงินสด”</p>
         <button type="button" id="voice-start" class="voice-record" autofocus>
           <span aria-hidden="true">🎙</span> <span id="voice-start-label">เริ่มพูด</span>
         </button>
@@ -1234,7 +1234,7 @@
       <details id="voice-transcript" class="voice-details">
         <summary id="voice-transcript-label">พิมพ์หรือใช้ไมค์บนแป้นพิมพ์</summary>
         <label for="voice-text">ข้อความรายการ</label>
-        <textarea id="voice-text" class="form-input" rows="3" placeholder="เช่น ข้าว 60 บาท จ่ายผ่านเงินสด"></textarea>
+        <textarea id="voice-text" class="form-input" rows="3" placeholder="เช่น เมื่อวาน ข้าว 60 บาท จ่ายผ่านเงินสด"></textarea>
         <button type="button" id="voice-parse" class="voice-secondary">ตรวจรายการ</button>
       </details>
       <section id="voice-review" aria-labelledby="voice-review-title" hidden>
@@ -1243,7 +1243,7 @@
           <summary id="voice-summary"></summary>
           <div class="voice-field-grid">
             <label>ช่องทางจ่ายเริ่มต้น<select id="voice-account" class="form-input"></select></label>
-            <label>วันที่<input id="voice-date" type="date" class="form-input"></label>
+            <label>วันที่เริ่มต้น<input id="voice-date" type="date" class="form-input"></label>
           </div>
         </details>
         <div id="voice-items"></div>
@@ -1251,6 +1251,7 @@
       <details id="voice-help" class="voice-help">
         <summary>วิธีใช้และข้อมูลตรวจปัญหา</summary>
         <p>ใช้คำว่า “แล้ว” คั่นรายการ และพูด “จ่ายผ่าน” ตามด้วยชื่อช่องทางจ่ายของแต่ละรายการ การรู้จำเสียงอาจส่งเสียงไปยังบริการของเบราว์เซอร์</p>
+        <p>พูด “เมื่อวาน” หรือ “สองวันก่อน” ในแต่ละรายการได้ ถ้าไม่พูดวันที่ ระบบใช้วันนี้หรือวันที่เริ่มต้นที่คุณเลือก</p>
         <p id="voice-version"></p>
         <p>ข้อมูลตรวจปัญหามีข้อความที่พูด เก็บชั่วคราวในหน้านี้ และส่งต่อได้ด้วยการคัดลอกเอง</p>
         <textarea id="voice-diagnostics" class="form-input" rows="4" readonly aria-label="ข้อมูลตรวจปัญหาเสียง"></textarea>

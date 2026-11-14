@@ -4,6 +4,15 @@
   const digits = {ศูนย์:0, หนึ่ง:1, เอ็ด:1, สอง:2, ยี่:2, สาม:3, สี่:4, ห้า:5, หก:6, เจ็ด:7, แปด:8, เก้า:9};
   const units = {สิบ:10, ร้อย:100, พัน:1000, หมื่น:10000, แสน:100000, ล้าน:1000000};
   const numberWords = Object.keys({...digits, ...units}).join('|');
+  const relativeDatePattern = [
+    'เมื่อ\\s*วาน\\s*ซืน',
+    'เมื่อ\\s*วาน(?:\\s*นี้)?',
+    '(?:เมื่อ\\s*)?วาน\\s*นี้',
+    'วัน\\s*นี้',
+    '(?:เมื่อ\\s*)?(?:[-−]?[0-9๐-๙]+(?:[.,][0-9๐-๙]+)*|(?:' + numberWords + '\\s*)+|หลาย|ไม่กี่)\\s*วัน\\s*(?:ที่\\s*แล้ว|ก่อน)',
+    '(?:เมื่อ\\s*)?วัน\\s*ก่อน'
+  ].join('|');
+  const standaloneDate = new RegExp('^(?:' + relativeDatePattern + ')[.!?。]?$');
   const numberPattern = `(?:[0-9๐-๙]+(?:,[0-9๐-๙]{3})*(?:\\.[0-9๐-๙]{1,2})?|(?:(?:${numberWords})\\s*)+(?:จุด\\s*(?:(?:${Object.keys(digits).join('|')})\\s*)+)?)`;
   const paymentPattern = new RegExp('จ่าย\\s*ผ่าน\\s*(.*?)(?=\\s*(?:จ่าย\\s*ผ่าน|หมวดหมู่|หมวด|ที่ร้าน|จากร้าน|' + numberPattern + '\\s*บาท)|\\s+ร้าน|$)', 'g');
   function number(text) {
@@ -53,16 +62,54 @@
     return matches.length === 1 ? matches[0] : '';
   }
 
-  function parse(text, categories, accounts = []) {
+  function localDate(now) {
+    return [String(now.getFullYear()).padStart(4, '0'), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  }
+
+  function resolveDate(phrase, today) {
+    const compact = phrase.replace(/\s/g, '');
+    const namedOffsets = {'วันนี้': 0, 'เมื่อวาน': 1, 'เมื่อวานนี้': 1, 'วานนี้': 1, 'เมื่อวานซืน': 2};
+    let days = namedOffsets[compact];
+    if (days === undefined) {
+      const count = compact.replace(/^เมื่อ/, '').replace(/วัน(?:ที่แล้ว|ก่อน)$/, '');
+      // Two consecutive digit words can indicate an approximate count ("สองสาม").
+      const digitWord = '(?:' + Object.keys(digits).join('|') + ')';
+      if (new RegExp(digitWord + digitWord).test(count) || /[.,]/.test(count)) return '';
+      days = number(count);
+    }
+    if (!Number.isSafeInteger(days) || days < 0) return '';
+    // Do calendar arithmetic on the local date, without subtracting hours across DST.
+    const date = new Date(today + 'T00:00:00Z');
+    date.setUTCDate(date.getUTCDate() - days);
+    return date.getUTCFullYear() >= 1 && date.getUTCFullYear() <= 9999 ? date.toISOString().slice(0, 10) : '';
+  }
+
+  function parse(text, categories, accounts = [], now = new Date()) {
     const names = categories.map(c => typeof c === 'string' ? c : c.name);
+    const today = localDate(now);
     const sources = [];
-    for (const part of text.split(/\n|;|แล้วก็|แล้ว|รายการถัดไป|\s*และ\s*/).map(s => s.trim()).filter(Boolean)) {
-      if (/^จ่าย\s*ผ่าน/.test(part) && sources.length) sources[sources.length - 1] += ' ' + part;
+    // Keep "สองวันที่แล้ว" together while allowing "แล้ว" to separate expenses.
+    const separator = new RegExp('(' + relativeDatePattern + ')|\\n|;|แล้วก็|แล้ว|รายการถัดไป|\\s*และ\\s*', 'g');
+    const parts = [];
+    let start = 0;
+    for (const match of text.matchAll(separator)) {
+      if (match[1]) continue;
+      parts.push(text.slice(start, match.index));
+      start = match.index + match[0].length;
+    }
+    parts.push(text.slice(start));
+    for (const part of parts.map(s => s.trim()).filter(Boolean)) {
+      if ((/^จ่าย\s*ผ่าน/.test(part) || standaloneDate.test(part)) && sources.length) sources[sources.length - 1] += ' ' + part;
       else sources.push(part);
     }
     return sources.map(source => {
+      const spokenDates = [];
+      const datedText = source.replace(new RegExp(relativeDatePattern, 'g'), phrase => {
+        spokenDates.push(phrase);
+        return ' ';
+      });
       const payments = [];
-      let rest = source.replace(paymentPattern, (_, payment) => {
+      let rest = datedText.replace(paymentPattern, (_, payment) => {
         payments.push(payment.trim().replace(/^[,:：]+|[,.!?]+$/g, '').trim());
         return ' ';
       }).trim().replace(/^(?:ซื้อ|จ่ายค่า|จ่าย)\s*/, '');
@@ -95,6 +142,11 @@
           (rules.find(([r, n]) => r.test(itemName) && names.includes(n)) || [null, ''])[1];
       }
       const item = {itemName, amount, merchant, category, warning};
+      if (spokenDates.length) {
+        const dates = spokenDates.map(phrase => resolveDate(phrase, today));
+        item.spokenDate = spokenDates.join(' / ');
+        item.date = dates.every(date => date && date === dates[0]) ? dates[0] : '';
+      }
       if (payments.length) {
         item.spokenAccount = payments.filter(Boolean).join(' / ');
         const matches = payments.map(payment => matchAccount(payment, accounts));
@@ -111,8 +163,7 @@
       const stamp = Number(tx.createdAt) || Date.parse(tx.date) || 0;
       if (stamp >= latest) { latest = stamp; account = tx.account; }
     }
-    const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
-    return {account, date};
+    return {account, date: localDate(now)};
   }
   root.VoiceExpense = {parse, number, defaults};
   if (typeof module !== 'undefined') module.exports = root.VoiceExpense;
